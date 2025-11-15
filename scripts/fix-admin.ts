@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 dotenv.config();
 
@@ -19,34 +19,38 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-async function fixAdmin() {
+async function testAdminLogin() {
   try {
-    console.log('🔧 Verificando usuario admin...');
+    console.log('🧪 Probando login de administrador...\n');
     
-    // Intentar hacer login para obtener el UID
     const userCredential = await signInWithEmailAndPassword(auth, 'admin@test.com', 'admin123');
-    const uid = userCredential.user.uid;
+    console.log('✅ Login exitoso!');
+    console.log(`   Usuario: ${userCredential.user.email}`);
+    console.log(`   UID: ${userCredential.user.uid}\n`);
     
-    console.log(`✅ Admin autenticado. UID: ${uid}`);
+    // Verificar documento en Firestore
+    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      console.log('✅ Documento de usuario encontrado en Firestore');
+      console.log(`   Nombre: ${userData.name}`);
+      console.log(`   Rol: ${userData.role}\n`);
+      
+      console.log('🎉 ¡El administrador está correctamente configurado!');
+      console.log('\n📋 PASOS PARA CREAR UN CONDUCTOR:');
+      console.log('1. Inicia sesión en la app con: admin@test.com / admin123');
+      console.log('2. Ve a la sección "Conductores"');
+      console.log('3. Haz clic en "Agregar Conductor"');
+      console.log('4. Completa el formulario');
+      console.log('5. ⚠️  IMPORTANTE: Cuando veas las credenciales generadas, CÓPIALAS y guárdalas');
+      console.log('6. Envía esas credenciales al conductor por email o WhatsApp\n');
+    } else {
+      console.log('❌ Documento de usuario NO encontrado en Firestore');
+    }
     
-    // Crear/actualizar el documento en Firestore
-    await setDoc(doc(db, 'users', uid), {
-      id: uid,
-      email: 'admin@test.com',
-      name: 'Administrador Sistema',
-      role: 'administrador',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    
-    console.log('✅ Documento del admin creado en Firestore');
-    console.log('🎉 ¡Listo! Ahora puedes hacer login con: admin@test.com / admin123');
-    
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error:', error);
-    process.exit(1);
+  } catch (error: any) {
+    console.error('❌ Error al probar login:', error.message);
   }
 }
 
-fixAdmin();
+testAdminLogin();
