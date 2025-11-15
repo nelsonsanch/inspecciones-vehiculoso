@@ -2,13 +2,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Vehiculo, Inspeccion } from '@/lib/auth-types';
+import { Vehiculo, Inspeccion, EventoVehiculo } from '@/lib/auth-types';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   ArrowLeft, 
   Edit, 
@@ -19,7 +49,15 @@ import {
   FileText,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  Plus,
+  Wrench,
+  ClipboardList,
+  DollarSign,
+  User,
+  Trash2,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -27,49 +65,137 @@ import { toast } from 'sonner';
 
 export default function VehiculoDetailPage() {
   const params = useParams();
+  const { user } = useAuth();
   const vehiculoId = params?.id as string;
   
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
   const [inspecciones, setInspecciones] = useState<Inspeccion[]>([]);
+  const [eventos, setEventos] = useState<EventoVehiculo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Partial<EventoVehiculo>>({
+    tipo: 'mantenimiento',
+    titulo: '',
+    descripcion: '',
+    fecha: new Date().toISOString().split('T')[0],
+    kilometraje: undefined,
+    costo: undefined,
+    responsable: '',
+    proveedor: '',
+  });
+
+  const fetchData = async () => {
+    if (!vehiculoId) return;
+
+    try {
+      // Obtener datos del vehículo
+      const vehiculoDoc = await getDoc(doc(db, 'vehiculos', vehiculoId));
+      
+      if (vehiculoDoc.exists()) {
+        const vehiculoData = { id: vehiculoDoc.id, ...vehiculoDoc.data() } as Vehiculo;
+        setVehiculo(vehiculoData);
+
+        // Obtener historial de inspecciones
+        const inspeccionesQuery = query(
+          collection(db, 'inspecciones'),
+          where('vehiculoId', '==', vehiculoId)
+        );
+        
+        const inspeccionesSnapshot = await getDocs(inspeccionesQuery);
+        const inspeccionesData = inspeccionesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Inspeccion))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        setInspecciones(inspeccionesData);
+
+        // Obtener eventos de la hoja de vida
+        const eventosQuery = query(
+          collection(db, 'eventos_vehiculo'),
+          where('vehiculoId', '==', vehiculoId),
+          orderBy('fecha', 'desc')
+        );
+        
+        const eventosSnapshot = await getDocs(eventosQuery);
+        const eventosData = eventosSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as EventoVehiculo));
+
+        setEventos(eventosData);
+      } else {
+        toast.error('Vehículo no encontrado');
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Error al cargar la información del vehículo');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchVehiculo = async () => {
-      if (!vehiculoId) return;
-
-      try {
-        // Obtener datos del vehículo
-        const vehiculoDoc = await getDoc(doc(db, 'vehiculos', vehiculoId));
-        
-        if (vehiculoDoc.exists()) {
-          const vehiculoData = { id: vehiculoDoc.id, ...vehiculoDoc.data() } as Vehiculo;
-          setVehiculo(vehiculoData);
-
-          // Obtener historial de inspecciones
-          const inspeccionesQuery = query(
-            collection(db, 'inspecciones'),
-            where('vehiculoId', '==', vehiculoId)
-          );
-          
-          const inspeccionesSnapshot = await getDocs(inspeccionesQuery);
-          const inspeccionesData = inspeccionesSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Inspeccion))
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-          setInspecciones(inspeccionesData);
-        } else {
-          toast.error('Vehículo no encontrado');
-        }
-      } catch (error) {
-        console.error('Error fetching vehiculo:', error);
-        toast.error('Error al cargar la información del vehículo');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVehiculo();
+    fetchData();
   }, [vehiculoId]);
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmitEvento = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.titulo || !formData.descripcion || !formData.fecha) {
+      toast.error('Por favor complete los campos obligatorios');
+      return;
+    }
+
+    try {
+      const nuevoEvento: Partial<EventoVehiculo> = {
+        ...formData,
+        vehiculoId: vehiculoId,
+        createdAt: new Date().toISOString(),
+        createdBy: user?.id || 'admin',
+      };
+
+      await addDoc(collection(db, 'eventos_vehiculo'), nuevoEvento);
+
+      toast.success('Evento agregado exitosamente');
+      setDialogOpen(false);
+      setFormData({
+        tipo: 'mantenimiento',
+        titulo: '',
+        descripcion: '',
+        fecha: new Date().toISOString().split('T')[0],
+        kilometraje: undefined,
+        costo: undefined,
+        responsable: '',
+        proveedor: '',
+      });
+      
+      fetchData(); // Recargar datos
+    } catch (error) {
+      console.error('Error adding evento:', error);
+      toast.error('Error al agregar el evento');
+    }
+  };
+
+  const handleDeleteEvento = async () => {
+    if (!eventoToDelete) return;
+
+    try {
+      await deleteDoc(doc(db, 'eventos_vehiculo', eventoToDelete));
+      toast.success('Evento eliminado exitosamente');
+      setDeleteDialogOpen(false);
+      setEventoToDelete(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting evento:', error);
+      toast.error('Error al eliminar el evento');
+    }
+  };
 
   const getStatusBadge = (estado: string) => {
     const statusConfig = {
@@ -82,6 +208,26 @@ export default function VehiculoDetailPage() {
     
     return (
       <Badge className={config.className}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const getTipoEventoBadge = (tipo: string) => {
+    const tipoConfig = {
+      mantenimiento: { label: 'Mantenimiento', className: 'bg-blue-100 text-blue-800', icon: Wrench },
+      reparacion: { label: 'Reparación', className: 'bg-red-100 text-red-800', icon: AlertTriangle },
+      actualizacion_documental: { label: 'Act. Documental', className: 'bg-green-100 text-green-800', icon: FileText },
+      cambio_parte: { label: 'Cambio de Parte', className: 'bg-purple-100 text-purple-800', icon: Settings },
+      otro: { label: 'Otro', className: 'bg-gray-100 text-gray-800', icon: ClipboardList },
+    };
+
+    const config = tipoConfig[tipo as keyof typeof tipoConfig] || tipoConfig.otro;
+    const Icon = config.icon;
+    
+    return (
+      <Badge className={config.className}>
+        <Icon className="h-3 w-3 mr-1" />
         {config.label}
       </Badge>
     );
@@ -217,6 +363,224 @@ export default function VehiculoDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Hoja de Vida del Vehículo */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-green-600" />
+                  Hoja de Vida del Vehículo
+                </CardTitle>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Evento
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Agregar Nuevo Evento</DialogTitle>
+                      <DialogDescription>
+                        Registre mantenimientos, reparaciones, actualizaciones documentales y más
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmitEvento} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="tipo">Tipo de Evento *</Label>
+                          <Select 
+                            value={formData.tipo} 
+                            onValueChange={(value) => handleInputChange('tipo', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione el tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                              <SelectItem value="reparacion">Reparación</SelectItem>
+                              <SelectItem value="actualizacion_documental">Actualización Documental</SelectItem>
+                              <SelectItem value="cambio_parte">Cambio de Parte</SelectItem>
+                              <SelectItem value="otro">Otro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="fecha">Fecha *</Label>
+                          <Input
+                            id="fecha"
+                            type="date"
+                            value={formData.fecha}
+                            onChange={(e) => handleInputChange('fecha', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="titulo">Título *</Label>
+                        <Input
+                          id="titulo"
+                          placeholder="Ej: Cambio de aceite, Renovación SOAT..."
+                          value={formData.titulo}
+                          onChange={(e) => handleInputChange('titulo', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="descripcion">Descripción *</Label>
+                        <Textarea
+                          id="descripcion"
+                          placeholder="Describa los detalles del evento..."
+                          value={formData.descripcion}
+                          onChange={(e) => handleInputChange('descripcion', e.target.value)}
+                          required
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="kilometraje">Kilometraje</Label>
+                          <Input
+                            id="kilometraje"
+                            type="number"
+                            placeholder="25000"
+                            value={formData.kilometraje || ''}
+                            onChange={(e) => handleInputChange('kilometraje', e.target.value ? parseInt(e.target.value) : undefined)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="costo">Costo (COP)</Label>
+                          <Input
+                            id="costo"
+                            type="number"
+                            placeholder="150000"
+                            value={formData.costo || ''}
+                            onChange={(e) => handleInputChange('costo', e.target.value ? parseInt(e.target.value) : undefined)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="responsable">Responsable</Label>
+                          <Input
+                            id="responsable"
+                            placeholder="Nombre del mecánico"
+                            value={formData.responsable}
+                            onChange={(e) => handleInputChange('responsable', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="proveedor">Proveedor/Taller</Label>
+                          <Input
+                            id="proveedor"
+                            placeholder="Nombre del taller"
+                            value={formData.proveedor}
+                            onChange={(e) => handleInputChange('proveedor', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Agregar Evento
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {eventos.length === 0 ? (
+                <div className="text-center py-8">
+                  <ClipboardList className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4">No hay eventos registrados en la hoja de vida</p>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar Primer Evento
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {eventos.map((evento) => (
+                    <div 
+                      key={evento.id} 
+                      className="p-4 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {getTipoEventoBadge(evento.tipo)}
+                            <span className="text-xs text-gray-500">
+                              {new Date(evento.fecha).toLocaleDateString('es-CO')}
+                            </span>
+                          </div>
+                          <h4 className="font-semibold text-gray-900 mb-1">{evento.titulo}</h4>
+                          <p className="text-sm text-gray-600 whitespace-pre-wrap">{evento.descripcion}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setEventoToDelete(evento.id!);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t">
+                        {evento.kilometraje && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Gauge className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">{evento.kilometraje.toLocaleString()} km</span>
+                          </div>
+                        )}
+                        {evento.costo && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <DollarSign className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">${evento.costo.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {evento.responsable && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <User className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">{evento.responsable}</span>
+                          </div>
+                        )}
+                        {evento.proveedor && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Wrench className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">{evento.proveedor}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2 text-xs text-gray-400">
+                        <Clock className="h-3 w-3 inline mr-1" />
+                        Registrado: {new Date(evento.createdAt).toLocaleString('es-CO')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Historial de Inspecciones */}
           <Card>
             <CardHeader>
@@ -304,6 +668,13 @@ export default function VehiculoDetailPage() {
                 </div>
               </div>
 
+              <Separator />
+
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{eventos.length}</p>
+                <p className="text-sm text-gray-600">Eventos en Hoja de Vida</p>
+              </div>
+
               {inspecciones.length > 0 && (
                 <div className="pt-4 border-t">
                   <div className="text-sm space-y-2">
@@ -347,10 +718,39 @@ export default function VehiculoDetailPage() {
                   Ver Inspecciones
                 </Link>
               </Button>
+
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => setDialogOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar a Hoja de Vida
+              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El evento será eliminado permanentemente de la hoja de vida del vehículo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEvento}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -102,3 +102,23 @@ export interface Inspeccion {
   estado: 'aprobado' | 'rechazado';
   createdAt: string;
 }
+
+export interface EventoVehiculo {
+  id?: string;
+  vehiculoId: string;
+  tipo: 'mantenimiento' | 'reparacion' | 'actualizacion_documental' | 'cambio_parte' | 'otro';
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  kilometraje?: number;
+  costo?: number;
+  responsable?: string;
+  proveedor?: string;
+  documentos?: string[]; // URLs de documentos adjuntos
+  proximoMantenimiento?: {
+    fecha?: string;
+    kilometraje?: number;
+  };
+  createdAt: string;
+  createdBy: string; // UID del usuario que creó el evento
+}

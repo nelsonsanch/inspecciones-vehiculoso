@@ -23,6 +23,7 @@ import {
   Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 interface InspeccionWithVehiculo extends Inspeccion {
   vehiculo?: Vehiculo;
@@ -311,9 +312,11 @@ export default function InspeccionesConductorPage() {
                   </div>
 
                   <div className="flex flex-col gap-2 ml-4">
-                    <Button variant="outline" size="sm" className="whitespace-nowrap">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver Detalle
+                    <Button variant="outline" size="sm" className="whitespace-nowrap" asChild>
+                      <Link href={`/conductor/inspecciones/${inspeccion.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver Detalle
+                      </Link>
                     </Button>
                   </div>
                 </div>
