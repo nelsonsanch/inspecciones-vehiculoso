@@ -16,7 +16,8 @@ export interface Vehiculo {
   año: number;
   tipoVehiculo: string;
   color: string;
-  kilometraje: number;
+  kilometraje: number; // Kilometraje inicial (al momento de compra)
+  kilometrajeActual?: number; // Kilometraje actual (se actualiza con cada inspección)
   estado: 'activo' | 'inactivo' | 'mantenimiento';
   // Fechas de vencimiento de documentos
   soatVencimiento?: string; // Formato: YYYY-MM-DD

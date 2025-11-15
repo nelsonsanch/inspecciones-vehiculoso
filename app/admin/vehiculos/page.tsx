@@ -258,9 +258,23 @@ export default function VehiculosPage() {
                     <span className="font-medium capitalize">{vehiculo.color}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Kilometraje:</span>
+                    <span className="text-gray-500">Km Inicial:</span>
                     <span className="font-medium">{vehiculo.kilometraje?.toLocaleString() || '0'} km</span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Km Actual:</span>
+                    <span className="font-medium text-blue-600">
+                      {vehiculo.kilometrajeActual?.toLocaleString() || vehiculo.kilometraje?.toLocaleString() || '0'} km
+                    </span>
+                  </div>
+                  {vehiculo.kilometrajeActual && vehiculo.kilometrajeActual > vehiculo.kilometraje && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Recorridos:</span>
+                      <span className="font-medium text-green-600">
+                        {(vehiculo.kilometrajeActual - vehiculo.kilometraje).toLocaleString()} km
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end space-x-2">

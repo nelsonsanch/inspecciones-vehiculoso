@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, getDoc, addDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { Vehiculo, Conductor, RespuestaInspeccion } from '@/lib/auth-types';
@@ -315,6 +315,12 @@ export default function FormularioInspeccionPage() {
       };
 
       await addDoc(collection(db, 'inspecciones'), inspeccionData);
+
+      // Actualizar el kilometraje actual del vehículo
+      await updateDoc(doc(db, 'vehiculos', vehiculo.id), {
+        kilometrajeActual: formData.kilometrajeActual,
+        updatedAt: now.toISOString()
+      });
 
       toast.success(`Inspección ${estado} guardada correctamente`);
       router.push('/conductor/inspecciones');

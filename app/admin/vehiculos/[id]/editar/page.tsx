@@ -50,7 +50,9 @@ export default function EditarVehiculoPage() {
     tipoVehiculo: '',
     color: '',
     kilometraje: 0,
-    estado: 'activo'
+    estado: 'activo',
+    soatVencimiento: '',
+    tecnomecanicaVencimiento: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,7 +77,9 @@ export default function EditarVehiculoPage() {
             tipoVehiculo: vehiculoData.tipoVehiculo || '',
             color: vehiculoData.color || '',
             kilometraje: vehiculoData.kilometraje || 0,
-            estado: vehiculoData.estado || 'activo'
+            estado: vehiculoData.estado || 'activo',
+            soatVencimiento: vehiculoData.soatVencimiento || '',
+            tecnomecanicaVencimiento: vehiculoData.tecnomecanicaVencimiento || ''
           });
         } else {
           toast.error('Vehículo no encontrado');
@@ -282,7 +286,7 @@ export default function EditarVehiculoPage() {
               </div>
 
               <div>
-                <Label htmlFor="kilometraje">Kilometraje</Label>
+                <Label htmlFor="kilometraje">Kilometraje Inicial</Label>
                 <Input
                   id="kilometraje"
                   type="number"
@@ -291,6 +295,32 @@ export default function EditarVehiculoPage() {
                   min="0"
                   placeholder="0"
                 />
+              </div>
+            </div>
+
+            {/* Vencimientos de Documentos */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Fechas de Vencimiento de Documentos</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="soatVencimiento">Vencimiento SOAT</Label>
+                  <Input
+                    id="soatVencimiento"
+                    type="date"
+                    value={formData.soatVencimiento}
+                    onChange={(e) => handleInputChange('soatVencimiento', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="tecnomecanicaVencimiento">Vencimiento Tecnomecánica</Label>
+                  <Input
+                    id="tecnomecanicaVencimiento"
+                    type="date"
+                    value={formData.tecnomecanicaVencimiento}
+                    onChange={(e) => handleInputChange('tecnomecanicaVencimiento', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
