@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -77,8 +77,8 @@ export default function NuevoConductorPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, generatedPassword);
       const firebaseUser = userCredential.user;
 
-      // Crear documento del usuario en Firestore
-      await addDoc(collection(db, 'users'), {
+      // Crear documento del usuario en Firestore con el UID como ID del documento
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
         id: firebaseUser.uid,
         email: formData.email,
         name: formData.nombre,
