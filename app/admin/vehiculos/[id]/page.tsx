@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Vehiculo, Inspeccion, EventoVehiculo } from '@/lib/auth-types';
 import { useAuth } from '@/contexts/auth-context';
@@ -113,13 +113,13 @@ export default function VehiculoDetailPage() {
         // Obtener eventos de la hoja de vida
         const eventosQuery = query(
           collection(db, 'eventos_vehiculo'),
-          where('vehiculoId', '==', vehiculoId),
-          orderBy('fecha', 'desc')
+          where('vehiculoId', '==', vehiculoId)
         );
         
         const eventosSnapshot = await getDocs(eventosQuery);
         const eventosData = eventosSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as EventoVehiculo));
+          .map(doc => ({ id: doc.id, ...doc.data() } as EventoVehiculo))
+          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
         setEventos(eventosData);
       } else {
