@@ -1,18 +1,23 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { doc, getDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
-import { Vehiculo, Conductor } from '@/lib/auth-types';
+import { Vehiculo, Conductor, RespuestaInspeccion } from '@/lib/auth-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   ArrowLeft, 
   Save, 
@@ -23,56 +28,111 @@ import {
   Droplets,
   Loader2,
   CheckCircle,
-  XCircle
+  XCircle,
+  Heart,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { ItemInspeccion } from '@/components/inspeccion/item-inspeccion';
 
 interface InspeccionFormData {
   kilometrajeActual: number;
+  destino: string;
+  estadoSalud: {
+    horasSueno: number;
+    estadoSaludActual: string;
+    consumeMedicamentos: string;
+  };
   documentacion: {
-    soatVigente: boolean;
-    tecnomecanicaVigente: boolean;
-    tarjetaPropiedad: boolean;
-    polizaSeguro: boolean;
+    soat: RespuestaInspeccion;
+    tecnomecanica: RespuestaInspeccion;
+    tarjetaPropiedad: RespuestaInspeccion;
+    polizaSeguro: RespuestaInspeccion;
+    licenciaConductor: RespuestaInspeccion;
   };
   inspeccionExterior: {
-    carroceria: boolean;
-    espejos: boolean;
-    lucesDelanteras: boolean;
-    lucesTraseras: boolean;
-    lucesDireccionales: boolean;
-    lucesFrenos: boolean;
-    llantasEstado: boolean;
-    llantasPresion: boolean;
-    limpiabrisas: boolean;
-    vidrios: boolean;
+    carroceria: RespuestaInspeccion;
+    espejos: RespuestaInspeccion;
+    lucesDelanteras: RespuestaInspeccion;
+    lucesTraseras: RespuestaInspeccion;
+    lucesDireccionales: RespuestaInspeccion;
+    lucesFrenos: RespuestaInspeccion;
+    llantasEstado: RespuestaInspeccion;
+    llantasPresion: RespuestaInspeccion;
+    limpiabrisas: RespuestaInspeccion;
+    vidrios: RespuestaInspeccion;
   };
   inspeccionInterior: {
-    cinturones: boolean;
-    asientos: boolean;
-    tableroInstrumentos: boolean;
-    frenos: boolean;
-    direccion: boolean;
-    claxon: boolean;
-    pitoReversa: boolean;
+    cinturones: RespuestaInspeccion;
+    asientos: RespuestaInspeccion;
+    tableroInstrumentos: RespuestaInspeccion;
+    frenos: RespuestaInspeccion;
+    direccion: RespuestaInspeccion;
+    claxon: RespuestaInspeccion;
+    pitoReversa: RespuestaInspeccion;
   };
   elementosSeguridad: {
-    botiquin: boolean;
-    extintor: boolean;
-    kitCarreteras: boolean;
-    chalecoReflectivo: boolean;
-    tacos: boolean;
+    botiquin: RespuestaInspeccion;
+    extintor: RespuestaInspeccion;
+    kitCarreteras: RespuestaInspeccion;
+    chalecoReflectivo: RespuestaInspeccion;
+    tacos: RespuestaInspeccion;
   };
   nivealesFluidos: {
-    aceiteMotor: boolean;
-    liquidoFrenos: boolean;
-    refrigerante: boolean;
-    aguaLimpiaparabrisas: boolean;
+    aceiteMotor: RespuestaInspeccion;
+    liquidoFrenos: RespuestaInspeccion;
+    refrigerante: RespuestaInspeccion;
+    aguaLimpiaparabrisas: RespuestaInspeccion;
   };
   observaciones: string;
 }
+
+// Función para calcular días hasta vencimiento
+const calcularDiasVencimiento = (fechaVencimiento?: string): number | null => {
+  if (!fechaVencimiento) return null;
+  const hoy = new Date();
+  const vencimiento = new Date(fechaVencimiento);
+  const diferencia = vencimiento.getTime() - hoy.getTime();
+  return Math.ceil(diferencia / (1000 * 60 * 60 * 24));
+};
+
+// Componente para mostrar estado de vencimiento
+const EstadoVencimiento = ({ dias }: { dias: number | null }) => {
+  if (dias === null) {
+    return <span className="text-gray-400 text-sm">No registrado</span>;
+  }
+  
+  if (dias < 0) {
+    return (
+      <span className="flex items-center gap-1 text-red-600 text-sm font-medium">
+        <AlertTriangle className="h-4 w-4" />
+        Vencido hace {Math.abs(dias)} días
+      </span>
+    );
+  }
+  
+  if (dias === 0) {
+    return <span className="text-red-600 text-sm font-medium">Vence hoy</span>;
+  }
+  
+  if (dias <= 30) {
+    return (
+      <span className="flex items-center gap-1 text-orange-600 text-sm font-medium">
+        <Clock className="h-4 w-4" />
+        Vence en {dias} días
+      </span>
+    );
+  }
+  
+  return (
+    <span className="text-green-600 text-sm">
+      Vigente ({dias} días restantes)
+    </span>
+  );
+};
 
 export default function FormularioInspeccionPage() {
   const params = useParams();
@@ -87,45 +147,52 @@ export default function FormularioInspeccionPage() {
 
   const [formData, setFormData] = useState<InspeccionFormData>({
     kilometrajeActual: 0,
+    destino: '',
+    estadoSalud: {
+      horasSueno: 0,
+      estadoSaludActual: '',
+      consumeMedicamentos: '',
+    },
     documentacion: {
-      soatVigente: false,
-      tecnomecanicaVigente: false,
-      tarjetaPropiedad: false,
-      polizaSeguro: false,
+      soat: 'bueno',
+      tecnomecanica: 'bueno',
+      tarjetaPropiedad: 'bueno',
+      polizaSeguro: 'bueno',
+      licenciaConductor: 'bueno',
     },
     inspeccionExterior: {
-      carroceria: false,
-      espejos: false,
-      lucesDelanteras: false,
-      lucesTraseras: false,
-      lucesDireccionales: false,
-      lucesFrenos: false,
-      llantasEstado: false,
-      llantasPresion: false,
-      limpiabrisas: false,
-      vidrios: false,
+      carroceria: 'bueno',
+      espejos: 'bueno',
+      lucesDelanteras: 'bueno',
+      lucesTraseras: 'bueno',
+      lucesDireccionales: 'bueno',
+      lucesFrenos: 'bueno',
+      llantasEstado: 'bueno',
+      llantasPresion: 'bueno',
+      limpiabrisas: 'bueno',
+      vidrios: 'bueno',
     },
     inspeccionInterior: {
-      cinturones: false,
-      asientos: false,
-      tableroInstrumentos: false,
-      frenos: false,
-      direccion: false,
-      claxon: false,
-      pitoReversa: false,
+      cinturones: 'bueno',
+      asientos: 'bueno',
+      tableroInstrumentos: 'bueno',
+      frenos: 'bueno',
+      direccion: 'bueno',
+      claxon: 'bueno',
+      pitoReversa: 'bueno',
     },
     elementosSeguridad: {
-      botiquin: false,
-      extintor: false,
-      kitCarreteras: false,
-      chalecoReflectivo: false,
-      tacos: false,
+      botiquin: 'bueno',
+      extintor: 'bueno',
+      kitCarreteras: 'bueno',
+      chalecoReflectivo: 'bueno',
+      tacos: 'bueno',
     },
     nivealesFluidos: {
-      aceiteMotor: false,
-      liquidoFrenos: false,
-      refrigerante: false,
-      aguaLimpiaparabrisas: false,
+      aceiteMotor: 'bueno',
+      liquidoFrenos: 'bueno',
+      refrigerante: 'bueno',
+      aguaLimpiaparabrisas: 'bueno',
     },
     observaciones: '',
   });
@@ -167,20 +234,14 @@ export default function FormularioInspeccionPage() {
     fetchData();
   }, [vehiculoId, user]);
 
-  const handleCheckboxChange = (section: string, field: string, checked: boolean) => {
-    setFormData(prev => {
-      const currentSection = prev[section as keyof InspeccionFormData];
-      if (typeof currentSection === 'object' && currentSection !== null) {
-        return {
-          ...prev,
-          [section]: {
-            ...currentSection,
-            [field]: checked
-          }
-        };
+  const handleChange = (section: string, field: string, value: RespuestaInspeccion) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...(prev[section as keyof InspeccionFormData] as Record<string, any>),
+        [field]: value
       }
-      return prev;
-    });
+    }));
   };
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -190,13 +251,22 @@ export default function FormularioInspeccionPage() {
     }));
   };
 
+  const handleSaludChange = (field: string, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      estadoSalud: {
+        ...prev.estadoSalud,
+        [field]: value
+      }
+    }));
+  };
+
   const calculateEstado = () => {
-    // Elementos críticos que causan rechazo si fallan
+    // Elementos críticos que causan rechazo si están en "malo"
     const elementosCriticos = [
-      // Documentación crítica
-      formData.documentacion.soatVigente,
-      formData.documentacion.tecnomecanicaVigente,
-      // Elementos de seguridad críticos
+      formData.documentacion.soat,
+      formData.documentacion.tecnomecanica,
+      formData.documentacion.licenciaConductor,
       formData.inspeccionExterior.lucesFrenos,
       formData.inspeccionExterior.llantasEstado,
       formData.inspeccionInterior.frenos,
@@ -205,12 +275,28 @@ export default function FormularioInspeccionPage() {
       formData.elementosSeguridad.extintor,
     ];
 
-    return elementosCriticos.every(elemento => elemento) ? 'aprobado' : 'rechazado';
+    return elementosCriticos.every(elemento => elemento === 'bueno' || elemento === 'no-aplica') ? 'aprobado' : 'rechazado';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehiculo || !conductor) return;
+
+    // Validaciones
+    if (!formData.destino.trim()) {
+      toast.error('Por favor indique el destino del vehículo');
+      return;
+    }
+
+    if (formData.estadoSalud.horasSueno <= 0) {
+      toast.error('Por favor indique las horas de sueño');
+      return;
+    }
+
+    if (!formData.estadoSalud.estadoSaludActual) {
+      toast.error('Por favor indique el estado de salud actual');
+      return;
+    }
 
     setSaving(true);
 
@@ -272,6 +358,9 @@ export default function FormularioInspeccionPage() {
   }
 
   const estado = calculateEstado();
+  const diasSoat = calcularDiasVencimiento(vehiculo.soatVencimiento);
+  const diasTecnomecanica = calcularDiasVencimiento(vehiculo.tecnomecanicaVencimiento);
+  const diasLicencia = calcularDiasVencimiento(conductor.licenciaVencimiento);
 
   return (
     <div className="space-y-6">
@@ -289,7 +378,7 @@ export default function FormularioInspeccionPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Vehicle and General Info */}
+        {/* Información General */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -317,15 +406,82 @@ export default function FormularioInspeccionPage() {
               </div>
             </div>
             <Separator />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="kilometraje">Kilometraje Actual *</Label>
+                <Input
+                  id="kilometraje"
+                  type="number"
+                  value={formData.kilometrajeActual}
+                  onChange={(e) => handleInputChange('kilometrajeActual', parseInt(e.target.value) || 0)}
+                  min={vehiculo.kilometraje || 0}
+                  placeholder={`Mínimo ${vehiculo.kilometraje || 0} km`}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="destino">Destino del Vehículo *</Label>
+                <Input
+                  id="destino"
+                  type="text"
+                  value={formData.destino}
+                  onChange={(e) => handleInputChange('destino', e.target.value)}
+                  placeholder="Ej: Bogotá - Medellín"
+                  required
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Estado de Salud del Conductor */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-red-600" />
+              Estado de Salud del Conductor
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="horasSueno">Horas de Sueño (última noche) *</Label>
+                <Input
+                  id="horasSueno"
+                  type="number"
+                  value={formData.estadoSalud.horasSueno}
+                  onChange={(e) => handleSaludChange('horasSueno', parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={24}
+                  placeholder="Ej: 7"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="estadoSaludActual">Estado de Salud Actual *</Label>
+                <Select 
+                  value={formData.estadoSalud.estadoSaludActual} 
+                  onValueChange={(value) => handleSaludChange('estadoSaludActual', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione su estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bueno">Bueno</SelectItem>
+                    <SelectItem value="regular">Regular</SelectItem>
+                    <SelectItem value="malo">Malo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div>
-              <Label htmlFor="kilometraje">Kilometraje Actual</Label>
+              <Label htmlFor="consumeMedicamentos">¿Consume medicamentos? *</Label>
               <Input
-                id="kilometraje"
-                type="number"
-                value={formData.kilometrajeActual}
-                onChange={(e) => handleInputChange('kilometrajeActual', parseInt(e.target.value) || 0)}
-                min={vehiculo.kilometraje || 0}
-                placeholder={`Mínimo ${vehiculo.kilometraje || 0} km`}
+                id="consumeMedicamentos"
+                type="text"
+                value={formData.estadoSalud.consumeMedicamentos}
+                onChange={(e) => handleSaludChange('consumeMedicamentos', e.target.value)}
+                placeholder="Ej: No, o Sí - Nombre del medicamento"
                 required
               />
             </div>
@@ -337,30 +493,65 @@ export default function FormularioInspeccionPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" />
-              Documentación del Vehículo
+              Documentación del Vehículo y Conductor
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(formData.documentacion).map(([key, value]) => (
-              <div key={key} className="flex items-center space-x-3">
-                <Checkbox
-                  id={key}
-                  checked={value}
-                  onCheckedChange={(checked) => 
-                    handleCheckboxChange('documentacion', key, checked as boolean)
-                  }
-                />
-                <Label htmlFor={key} className="flex-1 capitalize">
-                  {key === 'soatVigente' && 'SOAT Vigente'}
-                  {key === 'tecnomecanicaVigente' && 'Tecnomecánica Vigente'}
-                  {key === 'tarjetaPropiedad' && 'Tarjeta de Propiedad'}
-                  {key === 'polizaSeguro' && 'Póliza de Seguro'}
-                </Label>
-                {(key === 'soatVigente' || key === 'tecnomecanicaVigente') && (
-                  <span className="text-xs text-red-500">*Crítico</span>
-                )}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold">SOAT</span>
+                <EstadoVencimiento dias={diasSoat} />
               </div>
-            ))}
+              <ItemInspeccion
+                id="soat"
+                label=""
+                value={formData.documentacion.soat}
+                onChange={(value) => handleChange('documentacion', 'soat', value)}
+                critico
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold">Tecnomecánica</span>
+                <EstadoVencimiento dias={diasTecnomecanica} />
+              </div>
+              <ItemInspeccion
+                id="tecnomecanica"
+                label=""
+                value={formData.documentacion.tecnomecanica}
+                onChange={(value) => handleChange('documentacion', 'tecnomecanica', value)}
+                critico
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold">Licencia de Conducción</span>
+                <EstadoVencimiento dias={diasLicencia} />
+              </div>
+              <ItemInspeccion
+                id="licencia"
+                label=""
+                value={formData.documentacion.licenciaConductor}
+                onChange={(value) => handleChange('documentacion', 'licenciaConductor', value)}
+                critico
+              />
+            </div>
+
+            <ItemInspeccion
+              id="tarjeta"
+              label="Tarjeta de Propiedad"
+              value={formData.documentacion.tarjetaPropiedad}
+              onChange={(value) => handleChange('documentacion', 'tarjetaPropiedad', value)}
+            />
+
+            <ItemInspeccion
+              id="poliza"
+              label="Póliza de Seguro"
+              value={formData.documentacion.polizaSeguro}
+              onChange={(value) => handleChange('documentacion', 'polizaSeguro', value)}
+            />
           </CardContent>
         </Card>
 
@@ -373,32 +564,68 @@ export default function FormularioInspeccionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(formData.inspeccionExterior).map(([key, value]) => (
-              <div key={key} className="flex items-center space-x-3">
-                <Checkbox
-                  id={key}
-                  checked={value}
-                  onCheckedChange={(checked) => 
-                    handleCheckboxChange('inspeccionExterior', key, checked as boolean)
-                  }
-                />
-                <Label htmlFor={key} className="flex-1 capitalize">
-                  {key === 'carroceria' && 'Carrocería (sin daños)'}
-                  {key === 'espejos' && 'Espejos (completos y funcionales)'}
-                  {key === 'lucesDelanteras' && 'Luces Delanteras'}
-                  {key === 'lucesTraseras' && 'Luces Traseras'}
-                  {key === 'lucesDireccionales' && 'Luces Direccionales'}
-                  {key === 'lucesFrenos' && 'Luces de Frenos'}
-                  {key === 'llantasEstado' && 'Estado de Llantas'}
-                  {key === 'llantasPresion' && 'Presión de Llantas'}
-                  {key === 'limpiabrisas' && 'Limpiabrisas'}
-                  {key === 'vidrios' && 'Vidrios (sin fracturas)'}
-                </Label>
-                {(key === 'lucesFrenos' || key === 'llantasEstado') && (
-                  <span className="text-xs text-red-500">*Crítico</span>
-                )}
-              </div>
-            ))}
+            <ItemInspeccion
+              id="carroceria"
+              label="Carrocería (sin daños)"
+              value={formData.inspeccionExterior.carroceria}
+              onChange={(value) => handleChange('inspeccionExterior', 'carroceria', value)}
+            />
+            <ItemInspeccion
+              id="espejos"
+              label="Espejos (completos y funcionales)"
+              value={formData.inspeccionExterior.espejos}
+              onChange={(value) => handleChange('inspeccionExterior', 'espejos', value)}
+            />
+            <ItemInspeccion
+              id="lucesDelanteras"
+              label="Luces Delanteras"
+              value={formData.inspeccionExterior.lucesDelanteras}
+              onChange={(value) => handleChange('inspeccionExterior', 'lucesDelanteras', value)}
+            />
+            <ItemInspeccion
+              id="lucesTraseras"
+              label="Luces Traseras"
+              value={formData.inspeccionExterior.lucesTraseras}
+              onChange={(value) => handleChange('inspeccionExterior', 'lucesTraseras', value)}
+            />
+            <ItemInspeccion
+              id="lucesDireccionales"
+              label="Luces Direccionales"
+              value={formData.inspeccionExterior.lucesDireccionales}
+              onChange={(value) => handleChange('inspeccionExterior', 'lucesDireccionales', value)}
+            />
+            <ItemInspeccion
+              id="lucesFrenos"
+              label="Luces de Frenos"
+              value={formData.inspeccionExterior.lucesFrenos}
+              onChange={(value) => handleChange('inspeccionExterior', 'lucesFrenos', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="llantasEstado"
+              label="Estado de Llantas"
+              value={formData.inspeccionExterior.llantasEstado}
+              onChange={(value) => handleChange('inspeccionExterior', 'llantasEstado', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="llantasPresion"
+              label="Presión de Llantas"
+              value={formData.inspeccionExterior.llantasPresion}
+              onChange={(value) => handleChange('inspeccionExterior', 'llantasPresion', value)}
+            />
+            <ItemInspeccion
+              id="limpiabrisas"
+              label="Limpiabrisas"
+              value={formData.inspeccionExterior.limpiabrisas}
+              onChange={(value) => handleChange('inspeccionExterior', 'limpiabrisas', value)}
+            />
+            <ItemInspeccion
+              id="vidrios"
+              label="Vidrios (sin fracturas)"
+              value={formData.inspeccionExterior.vidrios}
+              onChange={(value) => handleChange('inspeccionExterior', 'vidrios', value)}
+            />
           </CardContent>
         </Card>
 
@@ -411,29 +638,50 @@ export default function FormularioInspeccionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(formData.inspeccionInterior).map(([key, value]) => (
-              <div key={key} className="flex items-center space-x-3">
-                <Checkbox
-                  id={key}
-                  checked={value}
-                  onCheckedChange={(checked) => 
-                    handleCheckboxChange('inspeccionInterior', key, checked as boolean)
-                  }
-                />
-                <Label htmlFor={key} className="flex-1 capitalize">
-                  {key === 'cinturones' && 'Cinturones de Seguridad'}
-                  {key === 'asientos' && 'Asientos (buen estado)'}
-                  {key === 'tableroInstrumentos' && 'Tablero de Instrumentos'}
-                  {key === 'frenos' && 'Sistema de Frenos'}
-                  {key === 'direccion' && 'Sistema de Dirección'}
-                  {key === 'claxon' && 'Claxon'}
-                  {key === 'pitoReversa' && 'Pito de Reversa'}
-                </Label>
-                {(key === 'frenos' || key === 'direccion') && (
-                  <span className="text-xs text-red-500">*Crítico</span>
-                )}
-              </div>
-            ))}
+            <ItemInspeccion
+              id="cinturones"
+              label="Cinturones de Seguridad"
+              value={formData.inspeccionInterior.cinturones}
+              onChange={(value) => handleChange('inspeccionInterior', 'cinturones', value)}
+            />
+            <ItemInspeccion
+              id="asientos"
+              label="Asientos (buen estado)"
+              value={formData.inspeccionInterior.asientos}
+              onChange={(value) => handleChange('inspeccionInterior', 'asientos', value)}
+            />
+            <ItemInspeccion
+              id="tableroInstrumentos"
+              label="Tablero de Instrumentos"
+              value={formData.inspeccionInterior.tableroInstrumentos}
+              onChange={(value) => handleChange('inspeccionInterior', 'tableroInstrumentos', value)}
+            />
+            <ItemInspeccion
+              id="frenos"
+              label="Sistema de Frenos"
+              value={formData.inspeccionInterior.frenos}
+              onChange={(value) => handleChange('inspeccionInterior', 'frenos', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="direccion"
+              label="Sistema de Dirección"
+              value={formData.inspeccionInterior.direccion}
+              onChange={(value) => handleChange('inspeccionInterior', 'direccion', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="claxon"
+              label="Claxon"
+              value={formData.inspeccionInterior.claxon}
+              onChange={(value) => handleChange('inspeccionInterior', 'claxon', value)}
+            />
+            <ItemInspeccion
+              id="pitoReversa"
+              label="Pito de Reversa"
+              value={formData.inspeccionInterior.pitoReversa}
+              onChange={(value) => handleChange('inspeccionInterior', 'pitoReversa', value)}
+            />
           </CardContent>
         </Card>
 
@@ -446,27 +694,38 @@ export default function FormularioInspeccionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(formData.elementosSeguridad).map(([key, value]) => (
-              <div key={key} className="flex items-center space-x-3">
-                <Checkbox
-                  id={key}
-                  checked={value}
-                  onCheckedChange={(checked) => 
-                    handleCheckboxChange('elementosSeguridad', key, checked as boolean)
-                  }
-                />
-                <Label htmlFor={key} className="flex-1 capitalize">
-                  {key === 'botiquin' && 'Botiquín de Primeros Auxilios'}
-                  {key === 'extintor' && 'Extintor'}
-                  {key === 'kitCarreteras' && 'Kit de Carreteras'}
-                  {key === 'chalecoReflectivo' && 'Chaleco Reflectivo'}
-                  {key === 'tacos' && 'Tacos de Seguridad'}
-                </Label>
-                {(key === 'botiquin' || key === 'extintor') && (
-                  <span className="text-xs text-red-500">*Crítico</span>
-                )}
-              </div>
-            ))}
+            <ItemInspeccion
+              id="botiquin"
+              label="Botiquín de Primeros Auxilios"
+              value={formData.elementosSeguridad.botiquin}
+              onChange={(value) => handleChange('elementosSeguridad', 'botiquin', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="extintor"
+              label="Extintor"
+              value={formData.elementosSeguridad.extintor}
+              onChange={(value) => handleChange('elementosSeguridad', 'extintor', value)}
+              critico
+            />
+            <ItemInspeccion
+              id="kitCarreteras"
+              label="Kit de Carreteras"
+              value={formData.elementosSeguridad.kitCarreteras}
+              onChange={(value) => handleChange('elementosSeguridad', 'kitCarreteras', value)}
+            />
+            <ItemInspeccion
+              id="chalecoReflectivo"
+              label="Chaleco Reflectivo"
+              value={formData.elementosSeguridad.chalecoReflectivo}
+              onChange={(value) => handleChange('elementosSeguridad', 'chalecoReflectivo', value)}
+            />
+            <ItemInspeccion
+              id="tacos"
+              label="Tacos de Seguridad"
+              value={formData.elementosSeguridad.tacos}
+              onChange={(value) => handleChange('elementosSeguridad', 'tacos', value)}
+            />
           </CardContent>
         </Card>
 
@@ -479,23 +738,30 @@ export default function FormularioInspeccionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(formData.nivealesFluidos).map(([key, value]) => (
-              <div key={key} className="flex items-center space-x-3">
-                <Checkbox
-                  id={key}
-                  checked={value}
-                  onCheckedChange={(checked) => 
-                    handleCheckboxChange('nivealesFluidos', key, checked as boolean)
-                  }
-                />
-                <Label htmlFor={key} className="flex-1 capitalize">
-                  {key === 'aceiteMotor' && 'Aceite de Motor'}
-                  {key === 'liquidoFrenos' && 'Líquido de Frenos'}
-                  {key === 'refrigerante' && 'Refrigerante'}
-                  {key === 'aguaLimpiaparabrisas' && 'Agua Limpiaparabrisas'}
-                </Label>
-              </div>
-            ))}
+            <ItemInspeccion
+              id="aceiteMotor"
+              label="Aceite de Motor"
+              value={formData.nivealesFluidos.aceiteMotor}
+              onChange={(value) => handleChange('nivealesFluidos', 'aceiteMotor', value)}
+            />
+            <ItemInspeccion
+              id="liquidoFrenos"
+              label="Líquido de Frenos"
+              value={formData.nivealesFluidos.liquidoFrenos}
+              onChange={(value) => handleChange('nivealesFluidos', 'liquidoFrenos', value)}
+            />
+            <ItemInspeccion
+              id="refrigerante"
+              label="Refrigerante"
+              value={formData.nivealesFluidos.refrigerante}
+              onChange={(value) => handleChange('nivealesFluidos', 'refrigerante', value)}
+            />
+            <ItemInspeccion
+              id="aguaLimpiaparabrisas"
+              label="Agua Limpiaparabrisas"
+              value={formData.nivealesFluidos.aguaLimpiaparabrisas}
+              onChange={(value) => handleChange('nivealesFluidos', 'aguaLimpiaparabrisas', value)}
+            />
           </CardContent>
         </Card>
 

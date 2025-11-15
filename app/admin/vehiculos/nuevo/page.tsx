@@ -45,7 +45,9 @@ export default function NuevoVehiculoPage() {
     tipoVehiculo: '',
     color: '',
     kilometraje: 0,
-    estado: 'activo'
+    estado: 'activo',
+    soatVencimiento: '',
+    tecnomecanicaVencimiento: ''
   });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -233,6 +235,33 @@ export default function NuevoVehiculoPage() {
                   min="0"
                   placeholder="0"
                 />
+              </div>
+            </div>
+
+            {/* Fechas de Vencimiento de Documentos */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Documentos del Vehículo</h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="soatVencimiento">Fecha de Vencimiento SOAT</Label>
+                  <Input
+                    id="soatVencimiento"
+                    type="date"
+                    value={formData.soatVencimiento}
+                    onChange={(e) => handleInputChange('soatVencimiento', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="tecnomecanicaVencimiento">Fecha de Vencimiento Tecnomecánica</Label>
+                  <Input
+                    id="tecnomecanicaVencimiento"
+                    type="date"
+                    value={formData.tecnomecanicaVencimiento}
+                    onChange={(e) => handleInputChange('tecnomecanicaVencimiento', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

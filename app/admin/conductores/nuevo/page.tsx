@@ -33,7 +33,8 @@ export default function NuevoConductorPage() {
     numeroLicencia: '',
     categoriaLicencia: '',
     telefono: '',
-    email: ''
+    email: '',
+    licenciaVencimiento: ''
   });
   const [loading, setLoading] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{
@@ -339,6 +340,16 @@ export default function NuevoConductorPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="licenciaVencimiento">Fecha de Vencimiento de Licencia</Label>
+                <Input
+                  id="licenciaVencimiento"
+                  type="date"
+                  value={formData.licenciaVencimiento}
+                  onChange={(e) => handleInputChange('licenciaVencimiento', e.target.value)}
+                />
               </div>
             </div>
 

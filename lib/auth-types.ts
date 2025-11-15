@@ -18,6 +18,9 @@ export interface Vehiculo {
   color: string;
   kilometraje: number;
   estado: 'activo' | 'inactivo' | 'mantenimiento';
+  // Fechas de vencimiento de documentos
+  soatVencimiento?: string; // Formato: YYYY-MM-DD
+  tecnomecanicaVencimiento?: string; // Formato: YYYY-MM-DD
   createdAt: string;
   updatedAt: string;
 }
@@ -31,9 +34,13 @@ export interface Conductor {
   telefono: string;
   email: string;
   userId: string;
+  // Fecha de vencimiento de licencia
+  licenciaVencimiento?: string; // Formato: YYYY-MM-DD
   createdAt: string;
   updatedAt: string;
 }
+
+export type RespuestaInspeccion = 'bueno' | 'malo' | 'no-aplica';
 
 export interface Inspeccion {
   id: string;
@@ -42,45 +49,54 @@ export interface Inspeccion {
   fecha: string;
   hora: string;
   kilometrajeActual: number;
+  destino: string; // A dónde va el vehículo
+  // Estado de salud del conductor
+  estadoSalud: {
+    horasSueno: number;
+    estadoSaludActual: string; // Bueno, Regular, Malo
+    consumeMedicamentos: string; // Sí/No y cuáles
+  };
+  // Documentación con sistema de 3 opciones
   documentacion: {
-    soatVigente: boolean;
-    tecnomecanicaVigente: boolean;
-    tarjetaPropiedad: boolean;
-    polizaSeguro: boolean;
+    soat: RespuestaInspeccion;
+    tecnomecanica: RespuestaInspeccion;
+    tarjetaPropiedad: RespuestaInspeccion;
+    polizaSeguro: RespuestaInspeccion;
+    licenciaConductor: RespuestaInspeccion;
   };
   inspeccionExterior: {
-    carroceria: boolean;
-    espejos: boolean;
-    lucesDelanteras: boolean;
-    lucesTraseras: boolean;
-    lucesDireccionales: boolean;
-    lucesFrenos: boolean;
-    llantasEstado: boolean;
-    llantasPresion: boolean;
-    limpiabrisas: boolean;
-    vidrios: boolean;
+    carroceria: RespuestaInspeccion;
+    espejos: RespuestaInspeccion;
+    lucesDelanteras: RespuestaInspeccion;
+    lucesTraseras: RespuestaInspeccion;
+    lucesDireccionales: RespuestaInspeccion;
+    lucesFrenos: RespuestaInspeccion;
+    llantasEstado: RespuestaInspeccion;
+    llantasPresion: RespuestaInspeccion;
+    limpiabrisas: RespuestaInspeccion;
+    vidrios: RespuestaInspeccion;
   };
   inspeccionInterior: {
-    cinturones: boolean;
-    asientos: boolean;
-    tableroInstrumentos: boolean;
-    frenos: boolean;
-    direccion: boolean;
-    claxon: boolean;
-    pitoReversa: boolean;
+    cinturones: RespuestaInspeccion;
+    asientos: RespuestaInspeccion;
+    tableroInstrumentos: RespuestaInspeccion;
+    frenos: RespuestaInspeccion;
+    direccion: RespuestaInspeccion;
+    claxon: RespuestaInspeccion;
+    pitoReversa: RespuestaInspeccion;
   };
   elementosSeguridad: {
-    botiquin: boolean;
-    extintor: boolean;
-    kitCarreteras: boolean;
-    chalecoReflectivo: boolean;
-    tacos: boolean;
+    botiquin: RespuestaInspeccion;
+    extintor: RespuestaInspeccion;
+    kitCarreteras: RespuestaInspeccion;
+    chalecoReflectivo: RespuestaInspeccion;
+    tacos: RespuestaInspeccion;
   };
   nivealesFluidos: {
-    aceiteMotor: boolean;
-    liquidoFrenos: boolean;
-    refrigerante: boolean;
-    aguaLimpiaparabrisas: boolean;
+    aceiteMotor: RespuestaInspeccion;
+    liquidoFrenos: RespuestaInspeccion;
+    refrigerante: RespuestaInspeccion;
+    aguaLimpiaparabrisas: RespuestaInspeccion;
   };
   observaciones: string;
   estado: 'aprobado' | 'rechazado';
