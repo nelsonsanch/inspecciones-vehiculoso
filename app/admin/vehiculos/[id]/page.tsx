@@ -110,7 +110,7 @@ export default function VehiculoDetailPage() {
 
         setInspecciones(inspeccionesData);
 
-        // Obtener eventos de la hoja de vida
+        // Obtener eventos de la hoja de vida (sin orderBy para evitar índice compuesto)
         const eventosQuery = query(
           collection(db, 'eventos_vehiculo'),
           where('vehiculoId', '==', vehiculoId)
@@ -125,9 +125,14 @@ export default function VehiculoDetailPage() {
       } else {
         toast.error('Vehículo no encontrado');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
-      toast.error('Error al cargar la información del vehículo');
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      });
+      toast.error(`Error al cargar la información: ${error?.message || 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
