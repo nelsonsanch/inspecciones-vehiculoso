@@ -123,3 +123,27 @@ export interface EventoVehiculo {
   createdAt: string;
   createdBy: string; // UID del usuario que creó el evento
 }
+
+// Sistema de alertas y mantenimiento
+export type PrioridadAlerta = 'critica' | 'alta' | 'media' | 'baja';
+export type EstadoAlerta = 'pendiente' | 'en_proceso' | 'resuelta' | 'pospuesta';
+export type TipoAlerta = 'inspeccion_fallida' | 'documento_vencido' | 'documento_por_vencer' | 'mantenimiento_programado' | 'kilometraje_alto';
+
+export interface AlertaMantenimiento {
+  id?: string;
+  vehiculoId: string;
+  inspeccionId?: string; // Si la alerta proviene de una inspección
+  tipo: TipoAlerta;
+  prioridad: PrioridadAlerta;
+  titulo: string;
+  descripcion: string;
+  itemsAfectados?: string[]; // Ítems de inspección que fallaron
+  estado: EstadoAlerta;
+  fechaDeteccion: string;
+  fechaResolucion?: string;
+  eventoMantenimientoId?: string; // Si se creó un evento de mantenimiento
+  notas?: string;
+  creadoPor: string; // UID del usuario (o 'sistema' si es automático)
+  createdAt: string;
+  updatedAt: string;
+}

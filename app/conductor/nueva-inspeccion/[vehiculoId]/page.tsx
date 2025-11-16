@@ -5,6 +5,7 @@ import { doc, getDoc, addDoc, collection, getDocs, updateDoc } from 'firebase/fi
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { Vehiculo, Conductor, RespuestaInspeccion } from '@/lib/auth-types';
+import { generarAlertasDesdeInspeccion } from '@/lib/alertas-helper';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -314,13 +315,20 @@ export default function FormularioInspeccionPage() {
         createdAt: now.toISOString(),
       };
 
-      await addDoc(collection(db, 'inspecciones'), inspeccionData);
+      const docRef = await addDoc(collection(db, 'inspecciones'), inspeccionData);
 
       // Actualizar el kilometraje actual del vehículo
       await updateDoc(doc(db, 'vehiculos', vehiculo.id), {
         kilometrajeActual: formData.kilometrajeActual,
         updatedAt: now.toISOString()
       });
+
+      // Generar alertas automáticamente si hay problemas
+      await generarAlertasDesdeInspeccion(
+        { ...inspeccionData, id: docRef.id } as any,
+        vehiculo.placa,
+        user?.id || 'sistema'
+      );
 
       toast.success(`Inspección ${estado} guardada correctamente`);
       router.push('/conductor/inspecciones');

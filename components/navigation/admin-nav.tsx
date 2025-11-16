@@ -13,12 +13,14 @@ import {
   ClipboardList,
   LogOut,
   Shield,
-  Menu
+  Menu,
+  Bell
 } from 'lucide-react';
 import { useState } from 'react';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: BarChart3 },
+  { name: 'Alertas', href: '/admin/alertas', icon: Bell },
   { name: 'Vehículos', href: '/admin/vehiculos', icon: Car },
   { name: 'Conductores', href: '/admin/conductores', icon: Users },
   { name: 'Inspecciones', href: '/admin/inspecciones', icon: ClipboardList },
