@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CameraCapture } from '@/components/ui/camera-capture';
 import { ArrowLeft, Save, Car, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -49,6 +50,12 @@ export default function NuevoVehiculoPage() {
     soatVencimiento: '',
     tecnomecanicaVencimiento: ''
   });
+  const [fotos, setFotos] = useState<{
+    delantera?: File;
+    lateralIzquierda?: File;
+    lateralDerecha?: File;
+    trasera?: File;
+  }>({});
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -57,6 +64,38 @@ export default function NuevoVehiculoPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleFotoCapture = (posicion: 'delantera' | 'lateralIzquierda' | 'lateralDerecha' | 'trasera', file: File) => {
+    setFotos(prev => ({
+      ...prev,
+      [posicion]: file
+    }));
+  };
+
+  const handleFotoRemove = (posicion: 'delantera' | 'lateralIzquierda' | 'lateralDerecha' | 'trasera') => {
+    setFotos(prev => {
+      const newFotos = { ...prev };
+      delete newFotos[posicion];
+      return newFotos;
+    });
+  };
+
+  const uploadFoto = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/api/upload-image', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error al subir la imagen');
+    }
+    
+    const data = await response.json();
+    return data.cloudStoragePath;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,10 +109,36 @@ export default function NuevoVehiculoPage() {
         return;
       }
 
+      // Subir fotos a S3
+      const fotosUrls: {
+        delantera?: string;
+        lateralIzquierda?: string;
+        lateralDerecha?: string;
+        trasera?: string;
+      } = {};
+
+      if (fotos.delantera) {
+        toast.loading('Subiendo foto delantera...');
+        fotosUrls.delantera = await uploadFoto(fotos.delantera);
+      }
+      if (fotos.lateralIzquierda) {
+        toast.loading('Subiendo foto lateral izquierda...');
+        fotosUrls.lateralIzquierda = await uploadFoto(fotos.lateralIzquierda);
+      }
+      if (fotos.lateralDerecha) {
+        toast.loading('Subiendo foto lateral derecha...');
+        fotosUrls.lateralDerecha = await uploadFoto(fotos.lateralDerecha);
+      }
+      if (fotos.trasera) {
+        toast.loading('Subiendo foto trasera...');
+        fotosUrls.trasera = await uploadFoto(fotos.trasera);
+      }
+
       // Formatear placa en mayúsculas
       const vehiculoData = {
         ...formData,
         placa: formData.placa.toUpperCase(),
+        fotos: fotosUrls,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -262,6 +327,38 @@ export default function NuevoVehiculoPage() {
                     onChange={(e) => handleInputChange('tecnomecanicaVencimiento', e.target.value)}
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Fotos del Vehículo */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Fotos del Vehículo</h3>
+              <p className="text-sm text-gray-600">Capture las fotos del vehículo desde diferentes ángulos</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <CameraCapture
+                  label="Foto Delantera"
+                  onCapture={(file) => handleFotoCapture('delantera', file)}
+                  onRemove={() => handleFotoRemove('delantera')}
+                />
+                
+                <CameraCapture
+                  label="Foto Lateral Izquierda"
+                  onCapture={(file) => handleFotoCapture('lateralIzquierda', file)}
+                  onRemove={() => handleFotoRemove('lateralIzquierda')}
+                />
+                
+                <CameraCapture
+                  label="Foto Lateral Derecha"
+                  onCapture={(file) => handleFotoCapture('lateralDerecha', file)}
+                  onRemove={() => handleFotoRemove('lateralDerecha')}
+                />
+                
+                <CameraCapture
+                  label="Foto Trasera"
+                  onCapture={(file) => handleFotoCapture('trasera', file)}
+                  onRemove={() => handleFotoRemove('trasera')}
+                />
               </div>
             </div>
 

@@ -22,6 +22,13 @@ export interface Vehiculo {
   // Fechas de vencimiento de documentos
   soatVencimiento?: string; // Formato: YYYY-MM-DD
   tecnomecanicaVencimiento?: string; // Formato: YYYY-MM-DD
+  // Fotos del vehículo
+  fotos?: {
+    delantera?: string; // URL de S3
+    lateralIzquierda?: string; // URL de S3
+    lateralDerecha?: string; // URL de S3
+    trasera?: string; // URL de S3
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +107,7 @@ export interface Inspeccion {
     aguaLimpiaparabrisas: RespuestaInspeccion;
   };
   observaciones: string;
+  firmaConductor?: string; // URL de S3 con la firma digital
   estado: 'aprobado' | 'rechazado';
   createdAt: string;
 }

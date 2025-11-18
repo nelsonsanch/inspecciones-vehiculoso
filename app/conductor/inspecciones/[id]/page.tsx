@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import Image from 'next/image';
+import { downloadFile } from '@/lib/s3';
 
 export default function DetalleInspeccionPage() {
   const params = useParams();
@@ -354,6 +356,21 @@ export default function DetalleInspeccionPage() {
         </Card>
       )}
 
+      {/* Firma del Conductor */}
+      {inspeccion.firmaConductor && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              Firma del Conductor
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FirmaDisplay cloudStoragePath={inspeccion.firmaConductor} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Botón de regreso */}
       <div className="flex justify-center pt-4">
         <Button asChild size="lg" variant="outline">
@@ -363,6 +380,49 @@ export default function DetalleInspeccionPage() {
           </Link>
         </Button>
       </div>
+    </div>
+  );
+}
+
+// Componente para mostrar la firma del conductor
+function FirmaDisplay({ cloudStoragePath }: { cloudStoragePath: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        const url = await downloadFile(cloudStoragePath);
+        setImageUrl(url);
+      } catch (error) {
+        console.error('Error loading signature:', error);
+        toast.error('Error al cargar la firma');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadImage();
+  }, [cloudStoragePath]);
+
+  return (
+    <div className="relative w-full max-w-md mx-auto aspect-[2/1] bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200">
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        </div>
+      ) : imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt="Firma del conductor"
+          fill
+          className="object-contain p-2"
+        />
+      ) : (
+        <div className="flex items-center justify-center h-full text-gray-400">
+          <FileText className="w-8 h-8" />
+        </div>
+      )}
     </div>
   );
 }

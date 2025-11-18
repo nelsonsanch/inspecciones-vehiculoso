@@ -57,11 +57,14 @@ import {
   User,
   Trash2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import Image from 'next/image';
+import { downloadFile } from '@/lib/s3';
 
 export default function VehiculoDetailPage() {
   const params = useParams();
@@ -367,6 +370,46 @@ export default function VehiculoDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Fotos del Vehículo */}
+          {vehiculo.fotos && Object.keys(vehiculo.fotos).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-purple-600" />
+                  Fotos del Vehículo
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {vehiculo.fotos.delantera && (
+                    <FotoVehiculo 
+                      label="Vista Delantera" 
+                      cloudStoragePath={vehiculo.fotos.delantera} 
+                    />
+                  )}
+                  {vehiculo.fotos.lateralIzquierda && (
+                    <FotoVehiculo 
+                      label="Vista Lateral Izquierda" 
+                      cloudStoragePath={vehiculo.fotos.lateralIzquierda} 
+                    />
+                  )}
+                  {vehiculo.fotos.lateralDerecha && (
+                    <FotoVehiculo 
+                      label="Vista Lateral Derecha" 
+                      cloudStoragePath={vehiculo.fotos.lateralDerecha} 
+                    />
+                  )}
+                  {vehiculo.fotos.trasera && (
+                    <FotoVehiculo 
+                      label="Vista Trasera" 
+                      cloudStoragePath={vehiculo.fotos.trasera} 
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Hoja de Vida del Vehículo */}
           <Card>
@@ -756,6 +799,52 @@ export default function VehiculoDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// Componente para mostrar una foto del vehículo
+function FotoVehiculo({ label, cloudStoragePath }: { label: string; cloudStoragePath: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        const url = await downloadFile(cloudStoragePath);
+        setImageUrl(url);
+      } catch (error) {
+        console.error('Error loading image:', error);
+        toast.error('Error al cargar la imagen');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadImage();
+  }, [cloudStoragePath]);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-gray-700">{label}</p>
+      <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        ) : imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={label}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-400">
+            <Camera className="w-8 h-8" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

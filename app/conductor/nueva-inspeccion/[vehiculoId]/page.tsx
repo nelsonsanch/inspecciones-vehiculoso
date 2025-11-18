@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { SignaturePad } from '@/components/ui/signature-pad';
 import {
   Select,
   SelectContent,
@@ -32,7 +33,8 @@ import {
   XCircle,
   Heart,
   AlertTriangle,
-  Clock
+  Clock,
+  Edit
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -145,6 +147,7 @@ export default function FormularioInspeccionPage() {
   const [conductor, setConductor] = useState<Conductor | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [firmaDataUrl, setFirmaDataUrl] = useState<string>('');
 
   const [formData, setFormData] = useState<InspeccionFormData>({
     kilometrajeActual: 0,
@@ -299,11 +302,35 @@ export default function FormularioInspeccionPage() {
       return;
     }
 
+    if (!firmaDataUrl) {
+      toast.error('Por favor firme la inspección');
+      return;
+    }
+
     setSaving(true);
 
     try {
       const now = new Date();
       const estado = calculateEstado();
+
+      // Subir firma a S3
+      let firmaConductor = '';
+      if (firmaDataUrl) {
+        const response = await fetch('/api/upload-signature', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dataUrl: firmaDataUrl }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Error al subir la firma');
+        }
+
+        const data = await response.json();
+        firmaConductor = data.cloudStoragePath;
+      }
 
       const inspeccionData = {
         vehiculoId: vehiculo.id,
@@ -311,6 +338,7 @@ export default function FormularioInspeccionPage() {
         fecha: now.toISOString().split('T')[0],
         hora: now.toTimeString().slice(0, 5),
         ...formData,
+        firmaConductor,
         estado,
         createdAt: now.toISOString(),
       };
@@ -791,6 +819,25 @@ export default function FormularioInspeccionPage() {
               placeholder="Describa cualquier observación, anomalía o problema encontrado durante la inspección..."
               rows={4}
             />
+          </CardContent>
+        </Card>
+
+        {/* Firma del Conductor */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-600" />
+              Firma del Conductor
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SignaturePad
+              onSave={setFirmaDataUrl}
+              currentSignature={firmaDataUrl}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              * La firma es obligatoria para completar la inspección
+            </p>
           </CardContent>
         </Card>
 
