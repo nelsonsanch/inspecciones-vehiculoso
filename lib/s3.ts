@@ -1,13 +1,14 @@
 
 // Firebase Storage implementation
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import app from './firebase';
 
-// Get storage instance (lazy initialization)
+// Get storage instance (lazy initialization with explicit app)
 let storageInstance: ReturnType<typeof getStorage> | null = null;
 
 function getStorageInstance() {
   if (!storageInstance) {
-    storageInstance = getStorage();
+    storageInstance = getStorage(app);
   }
   return storageInstance;
 }
