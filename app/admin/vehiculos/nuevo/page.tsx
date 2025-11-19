@@ -82,20 +82,20 @@ export default function NuevoVehiculoPage() {
   };
 
   const uploadFoto = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
+    // Subir directamente desde el cliente a Firebase Storage
+    const { getStorage, ref, uploadBytes } = await import('firebase/storage');
+    const storage = getStorage();
+    const timestamp = Date.now();
+    const storagePath = `uploads/${timestamp}-${file.name}`;
+    const storageRef = ref(storage, storagePath);
     
-    const response = await fetch('/api/upload-image', {
-      method: 'POST',
-      body: formData,
+    // Subir el archivo
+    await uploadBytes(storageRef, file, {
+      contentType: file.type,
     });
     
-    if (!response.ok) {
-      throw new Error('Error al subir la imagen');
-    }
-    
-    const data = await response.json();
-    return data.cloudStoragePath;
+    // Retornar el path (no la URL completa)
+    return storagePath;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

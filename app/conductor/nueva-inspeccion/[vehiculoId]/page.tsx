@@ -313,23 +313,31 @@ export default function FormularioInspeccionPage() {
       const now = new Date();
       const estado = calculateEstado();
 
-      // Subir firma a S3
+      // Subir firma directamente a Firebase Storage
       let firmaConductor = '';
       if (firmaDataUrl) {
-        const response = await fetch('/api/upload-signature', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ dataUrl: firmaDataUrl }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Error al subir la firma');
+        const { getStorage, ref, uploadBytes } = await import('firebase/storage');
+        const storage = getStorage();
+        const timestamp = Date.now();
+        const storagePath = `signatures/${timestamp}-firma.png`;
+        const storageRef = ref(storage, storagePath);
+        
+        // Convertir dataURL a Blob
+        const base64Data = firmaDataUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
-
-        const data = await response.json();
-        firmaConductor = data.cloudStoragePath;
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        
+        // Subir el blob
+        await uploadBytes(storageRef, blob, {
+          contentType: 'image/png',
+        });
+        
+        firmaConductor = storagePath;
       }
 
       const inspeccionData = {
