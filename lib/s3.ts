@@ -1,42 +1,48 @@
 
-import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createS3Client, getBucketConfig } from "./aws-config";
+// Firebase Storage implementation
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
-const s3Client = createS3Client();
-const { bucketName, folderPrefix } = getBucketConfig();
+// Get storage instance (lazy initialization)
+let storageInstance: ReturnType<typeof getStorage> | null = null;
+
+function getStorageInstance() {
+  if (!storageInstance) {
+    storageInstance = getStorage();
+  }
+  return storageInstance;
+}
 
 export async function uploadFile(buffer: Buffer, fileName: string): Promise<string> {
-  const key = `${folderPrefix}uploads/${Date.now()}-${fileName}`;
+  const storage = getStorageInstance();
+  const timestamp = Date.now();
+  const storagePath = `uploads/${timestamp}-${fileName}`;
+  const storageRef = ref(storage, storagePath);
   
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: getContentType(fileName),
-    })
-  );
+  // Convert buffer to Blob
+  const blob = new Blob([buffer], { type: getContentType(fileName) });
   
-  return key;
-}
-
-export async function downloadFile(key: string): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: key,
+  // Upload to Firebase Storage
+  await uploadBytes(storageRef, blob, {
+    contentType: getContentType(fileName),
   });
   
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  // Return the storage path (not the full URL, we'll generate it on demand)
+  return storagePath;
 }
 
-export async function deleteFile(key: string): Promise<void> {
-  await s3Client.send(
-    new DeleteObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-    })
-  );
+export async function downloadFile(storagePath: string): Promise<string> {
+  const storage = getStorageInstance();
+  const storageRef = ref(storage, storagePath);
+  
+  // Get download URL (valid for a limited time)
+  return await getDownloadURL(storageRef);
+}
+
+export async function deleteFile(storagePath: string): Promise<void> {
+  const storage = getStorageInstance();
+  const storageRef = ref(storage, storagePath);
+  
+  await deleteObject(storageRef);
 }
 
 function getContentType(fileName: string): string {
