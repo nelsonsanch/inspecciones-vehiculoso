@@ -28,8 +28,21 @@ export default function LoginForm() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
+      // Forzar la actualización del token de autenticación
+      await userCredential.user.getIdToken(true);
+      
+      // Pequeña espera para asegurar que el token se haya propagado
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Obtener el rol del usuario desde Firestore
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (!userDoc.exists()) {
+        setError('Usuario no encontrado en el sistema. Contacta al administrador.');
+        setLoading(false);
+        return;
+      }
+      
       const userData = userDoc.data();
       
       // Redirigir según el rol
@@ -38,18 +51,21 @@ export default function LoginForm() {
       } else if (userData?.role === 'conductor') {
         router.push('/conductor/dashboard');
       } else {
-        router.push('/admin/dashboard'); // Por defecto
+        setError('Rol de usuario no válido. Contacta al administrador.');
+        setLoading(false);
+        return;
       }
     } catch (err: any) {
       console.error('Error de login:', err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Credenciales incorrectas');
       } else if (err.code === 'auth/invalid-email') {
         setError('Email inválido');
+      } else if (err.code === 'permission-denied') {
+        setError('Error de permisos. Por favor, intenta nuevamente en unos segundos.');
       } else {
         setError('Error al iniciar sesión. Intenta nuevamente.');
       }
-    } finally {
       setLoading(false);
     }
   };

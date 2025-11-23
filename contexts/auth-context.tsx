@@ -26,11 +26,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         setFirebaseUser(firebaseUser);
         
-        // Obtener datos del usuario desde Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          setUser(userData);
+        try {
+          // Forzar la actualización del token
+          await firebaseUser.getIdToken(true);
+          
+          // Pequeña espera para asegurar la propagación del token
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Obtener datos del usuario desde Firestore con reintentos
+          let userDoc;
+          let retries = 3;
+          
+          while (retries > 0) {
+            try {
+              userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+              break;
+            } catch (error: any) {
+              if (error.code === 'permission-denied' && retries > 1) {
+                // Esperar antes de reintentar
+                await new Promise(resolve => setTimeout(resolve, 500));
+                retries--;
+              } else {
+                throw error;
+              }
+            }
+          }
+          
+          if (userDoc && userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setUser(userData);
+          } else {
+            console.warn('Usuario autenticado pero sin documento en Firestore');
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error al obtener datos del usuario:', error);
+          setUser(null);
         }
       } else {
         setFirebaseUser(null);
