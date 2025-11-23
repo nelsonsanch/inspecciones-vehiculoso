@@ -106,10 +106,11 @@ export default function NuevoVehiculoPage() {
       // Validaciones básicas
       if (!formData.placa || !formData.marca || !formData.modelo || !formData.tipoVehiculo) {
         toast.error('Por favor complete todos los campos obligatorios');
+        setLoading(false);
         return;
       }
 
-      // Subir fotos a S3
+      // Subir fotos a Firebase Storage
       const fotosUrls: {
         delantera?: string;
         lateralIzquierda?: string;
@@ -117,34 +118,47 @@ export default function NuevoVehiculoPage() {
         trasera?: string;
       } = {};
 
+      // Usar un solo toast con ID para actualizarlo
+      let uploadToastId: string | number | undefined;
+
       if (fotos.delantera) {
-        toast.loading('Subiendo foto delantera...');
+        uploadToastId = toast.loading('Subiendo foto delantera...');
         fotosUrls.delantera = await uploadFoto(fotos.delantera);
+        toast.dismiss(uploadToastId);
       }
       if (fotos.lateralIzquierda) {
-        toast.loading('Subiendo foto lateral izquierda...');
+        uploadToastId = toast.loading('Subiendo foto lateral izquierda...');
         fotosUrls.lateralIzquierda = await uploadFoto(fotos.lateralIzquierda);
+        toast.dismiss(uploadToastId);
       }
       if (fotos.lateralDerecha) {
-        toast.loading('Subiendo foto lateral derecha...');
+        uploadToastId = toast.loading('Subiendo foto lateral derecha...');
         fotosUrls.lateralDerecha = await uploadFoto(fotos.lateralDerecha);
+        toast.dismiss(uploadToastId);
       }
       if (fotos.trasera) {
-        toast.loading('Subiendo foto trasera...');
+        uploadToastId = toast.loading('Subiendo foto trasera...');
         fotosUrls.trasera = await uploadFoto(fotos.trasera);
+        toast.dismiss(uploadToastId);
       }
 
+      // Guardar en Firestore
+      uploadToastId = toast.loading('Guardando vehículo...');
+      
       // Formatear placa en mayúsculas
       const vehiculoData = {
         ...formData,
         placa: formData.placa.toUpperCase(),
         fotos: fotosUrls,
+        kilometrajeInicial: formData.kilometraje,
+        kilometrajeActual: formData.kilometraje,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await addDoc(collection(db, 'vehiculos'), vehiculoData);
       
+      toast.dismiss(uploadToastId);
       toast.success('Vehículo agregado correctamente');
       router.push('/admin/vehiculos');
     } catch (error) {
