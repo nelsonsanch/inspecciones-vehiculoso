@@ -42,6 +42,7 @@ export interface Conductor {
   telefono: string;
   email: string;
   userId: string;
+  fotoUrl?: string; // URL de Firebase Storage con la foto del conductor
   // Fecha de vencimiento de licencia
   licenciaVencimiento?: string; // Formato: YYYY-MM-DD
   createdAt: string;
@@ -107,7 +108,8 @@ export interface Inspeccion {
     aguaLimpiaparabrisas: RespuestaInspeccion;
   };
   observaciones: string;
-  firmaConductor?: string; // URL de S3 con la firma digital
+  firmaConductor?: string; // URL de S3 con la firma digital (deprecated - usar pdfUrl)
+  pdfUrl?: string; // URL del PDF generado con los resultados de la inspección y firma
   estado: 'aprobado' | 'rechazado';
   createdAt: string;
 }

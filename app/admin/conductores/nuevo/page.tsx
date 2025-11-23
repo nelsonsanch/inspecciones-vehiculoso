@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
@@ -17,10 +17,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Save, Users, Loader2, Key, Copy } from 'lucide-react';
+import { ArrowLeft, Save, Users, Loader2, Key, Copy, Upload, Camera, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { uploadFile } from '@/lib/s3';
+import Image from 'next/image';
 
 const CATEGORIAS_LICENCIA = [
   'A1', 'A2', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'
@@ -36,11 +38,15 @@ export default function NuevoConductorPage() {
     email: '',
     licenciaVencimiento: ''
   });
+  const [foto, setFoto] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{
     email: string;
     password: string;
   } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const handleInputChange = (field: string, value: string) => {
@@ -48,6 +54,40 @@ export default function NuevoConductorPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor seleccione una imagen válida');
+        return;
+      }
+      
+      // Validar tamaño (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('La imagen no debe superar los 5MB');
+        return;
+      }
+
+      setFoto(file);
+      
+      // Crear preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveFoto = () => {
+    setFoto(null);
+    setFotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const generatePassword = () => {
@@ -62,12 +102,34 @@ export default function NuevoConductorPage() {
       // Validaciones básicas
       if (!formData.nombre || !formData.cedula || !formData.numeroLicencia || !formData.categoriaLicencia) {
         toast.error('Por favor complete todos los campos obligatorios');
+        setLoading(false);
         return;
       }
 
       if (!formData.email) {
         toast.error('El email es obligatorio para generar las credenciales de acceso');
+        setLoading(false);
         return;
+      }
+
+      // Subir foto si existe
+      let fotoUrl = '';
+      if (foto) {
+        setUploadingFoto(true);
+        try {
+          const buffer = Buffer.from(await foto.arrayBuffer());
+          const fileName = `conductores/${Date.now()}-${foto.name}`;
+          fotoUrl = await uploadFile(buffer, fileName);
+          console.log('Foto subida:', fotoUrl);
+        } catch (error) {
+          console.error('Error al subir la foto:', error);
+          toast.error('Error al subir la foto del conductor');
+          setLoading(false);
+          setUploadingFoto(false);
+          return;
+        } finally {
+          setUploadingFoto(false);
+        }
       }
 
       // Generar contraseña automática
@@ -91,6 +153,7 @@ export default function NuevoConductorPage() {
       const conductorData = {
         ...formData,
         userId: firebaseUser.uid,
+        ...(fotoUrl && { fotoUrl }), // Agregar fotoUrl solo si existe
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -262,6 +325,51 @@ export default function NuevoConductorPage() {
                   placeholder="Juan Pérez García"
                   required
                 />
+              </div>
+
+              {/* Foto del Conductor */}
+              <div>
+                <Label>Foto del Conductor (Opcional)</Label>
+                <div className="mt-2">
+                  {!fotoPreview ? (
+                    <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFotoChange}
+                        className="hidden"
+                        id="foto-conductor"
+                      />
+                      <label
+                        htmlFor="foto-conductor"
+                        className="flex flex-col items-center justify-center cursor-pointer w-full h-full"
+                      >
+                        <Camera className="h-12 w-12 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600">Haga clic para subir una foto</span>
+                        <span className="text-xs text-gray-500 mt-1">PNG, JPG (máx. 5MB)</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-48 border-2 border-gray-300 rounded-lg overflow-hidden">
+                      <Image
+                        src={fotoPreview}
+                        alt="Vista previa de foto del conductor"
+                        fill
+                        className="object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        onClick={handleRemoveFoto}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

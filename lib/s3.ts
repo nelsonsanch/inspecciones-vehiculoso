@@ -54,6 +54,7 @@ function getContentType(fileName: string): string {
     png: 'image/png',
     gif: 'image/gif',
     webp: 'image/webp',
+    pdf: 'application/pdf',
   };
   return contentTypes[ext || ''] || 'application/octet-stream';
 }

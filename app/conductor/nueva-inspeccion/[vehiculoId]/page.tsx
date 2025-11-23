@@ -34,12 +34,14 @@ import {
   Heart,
   AlertTriangle,
   Clock,
-  Edit
+  Edit,
+  Users
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ItemInspeccion } from '@/components/inspeccion/item-inspeccion';
+import Image from 'next/image';
 
 interface InspeccionFormData {
   kilometrajeActual: number;
@@ -313,45 +315,65 @@ export default function FormularioInspeccionPage() {
       const now = new Date();
       const estado = calculateEstado();
 
-      // Subir firma directamente a Firebase Storage
-      let firmaConductor = '';
-      if (firmaDataUrl) {
-        const { getStorage, ref, uploadBytes } = await import('firebase/storage');
-        const storage = getStorage();
-        const timestamp = Date.now();
-        const storagePath = `signatures/${timestamp}-firma.png`;
-        const storageRef = ref(storage, storagePath);
-        
-        // Convertir dataURL a Blob
-        const base64Data = firmaDataUrl.split(',')[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'image/png' });
-        
-        // Subir el blob
-        await uploadBytes(storageRef, blob, {
-          contentType: 'image/png',
-        });
-        
-        firmaConductor = storagePath;
-      }
-
+      // Crear documento de inspección primero (sin PDF)
       const inspeccionData = {
         vehiculoId: vehiculo.id,
         conductorId: conductor.id,
         fecha: now.toISOString().split('T')[0],
         hora: now.toTimeString().slice(0, 5),
         ...formData,
-        firmaConductor,
+        firmaConductor: '', // Se actualizará con la ruta del PDF
+        pdfUrl: '', // Se actualizará con la ruta del PDF
         estado,
         createdAt: now.toISOString(),
       };
 
       const docRef = await addDoc(collection(db, 'inspecciones'), inspeccionData);
+
+      // Generar PDF con la firma incluida
+      if (firmaDataUrl) {
+        try {
+          const pdfResponse = await fetch('/api/generar-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              inspeccion: {
+                ...inspeccionData,
+                id: docRef.id,
+                vehiculoId: vehiculo.id,
+              },
+              vehiculo: {
+                placa: vehiculo.placa,
+                marca: vehiculo.marca,
+                modelo: vehiculo.modelo,
+                tipoVehiculo: vehiculo.tipoVehiculo,
+              },
+              conductor: {
+                nombre: conductor.nombre,
+                numeroLicencia: conductor.numeroLicencia,
+              },
+              firmaBase64: firmaDataUrl,
+            }),
+          });
+
+          if (!pdfResponse.ok) {
+            throw new Error('Error al generar PDF');
+          }
+
+          const pdfResult = await pdfResponse.json();
+          
+          // Actualizar documento con la ruta del PDF
+          await updateDoc(doc(db, 'inspecciones', docRef.id), {
+            pdfUrl: pdfResult.pdfPath,
+            firmaConductor: pdfResult.pdfPath, // Guardar la misma ruta para compatibilidad
+          });
+        } catch (pdfError) {
+          console.error('Error generando PDF:', pdfError);
+          toast.error('Inspección guardada pero el PDF no pudo generarse');
+        }
+      }
 
       // Actualizar el kilometraje actual del vehículo
       await updateDoc(doc(db, 'vehiculos', vehiculo.id), {
@@ -426,6 +448,118 @@ export default function FormularioInspeccionPage() {
           <p className="text-gray-600">{vehiculo.placa} - {vehiculo.marca} {vehiculo.modelo}</p>
         </div>
       </div>
+
+      {/* Fotos del Conductor y Vehículo */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Conductor y Vehículo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Foto del Conductor */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-gray-700">Conductor</h3>
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50">
+                {conductor.fotoUrl ? (
+                  <Image
+                    src={conductor.fotoUrl}
+                    alt={`Foto de ${conductor.nombre}`}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <Users className="h-16 w-16 mb-2" />
+                    <span className="text-sm">Sin foto</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-center space-y-1">
+                <p className="font-medium text-gray-900">{conductor.nombre}</p>
+                <p className="text-gray-600">Lic. {conductor.numeroLicencia}</p>
+              </div>
+            </div>
+
+            {/* Fotos del Vehículo */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-gray-700">Vehículo</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Foto Delantera */}
+                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                  {vehiculo.fotos?.delantera ? (
+                    <Image
+                      src={vehiculo.fotos.delantera}
+                      alt="Vista delantera del vehículo"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Car className="h-8 w-8" />
+                      <span className="text-xs mt-1">Frontal</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Foto Lateral Izquierda */}
+                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                  {vehiculo.fotos?.lateralIzquierda ? (
+                    <Image
+                      src={vehiculo.fotos.lateralIzquierda}
+                      alt="Vista lateral izquierda del vehículo"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Car className="h-8 w-8" />
+                      <span className="text-xs mt-1">Lateral Izq.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Foto Lateral Derecha */}
+                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                  {vehiculo.fotos?.lateralDerecha ? (
+                    <Image
+                      src={vehiculo.fotos.lateralDerecha}
+                      alt="Vista lateral derecha del vehículo"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Car className="h-8 w-8" />
+                      <span className="text-xs mt-1">Lateral Der.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Foto Trasera */}
+                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                  {vehiculo.fotos?.trasera ? (
+                    <Image
+                      src={vehiculo.fotos.trasera}
+                      alt="Vista trasera del vehículo"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Car className="h-8 w-8" />
+                      <span className="text-xs mt-1">Trasera</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="text-sm text-center space-y-1 mt-2">
+                <p className="font-medium text-gray-900">{vehiculo.placa}</p>
+                <p className="text-gray-600">{vehiculo.marca} {vehiculo.modelo} ({vehiculo.año})</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Información General */}
