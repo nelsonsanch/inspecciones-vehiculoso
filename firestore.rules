@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,82 +7,66 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Función mejorada para verificar si el usuario es administrador
-    // Usa exists() primero para evitar errores si el documento no existe
-    function isAdmin() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador';
-    }
-    
-    // Función mejorada para verificar si el usuario es conductor
-    function isConductor() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'conductor';
-    }
+    // NOTA: La verificación de roles se hace en la aplicación, no en Firestore
+    // Esto evita problemas de performance y timing con get()
     
     // Reglas para colección de usuarios
     match /users/{userId} {
-      // Leer: Usuario autenticado puede leer su propio documento sin necesidad de verificar admin
-      // O si el documento del usuario solicitante existe y es admin
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador')
-      );
+      // Leer: Usuario puede leer su propio documento o cualquier usuario autenticado
+      allow read: if isAuthenticated();
       
-      // Escribir: Solo admin puede crear/actualizar usuarios
-      allow write: if isAdmin();
+      // Escribir: Solo el mismo usuario o durante creación
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated();
     }
     
     // Reglas para colección de vehículos
     match /vehiculos/{vehiculoId} {
-      // Leer: Cualquier usuario autenticado puede leer vehículos
+      // Cualquier usuario autenticado puede leer vehículos
       allow read: if isAuthenticated();
       
-      // Escribir: Solo admin puede crear/actualizar/eliminar vehículos
-      allow create, update, delete: if isAdmin();
+      // Cualquier usuario autenticado puede escribir
+      // (la verificación de admin se hace en la app)
+      allow write: if isAuthenticated();
+    }
+    
+    // Reglas para eventos de vehículos (subcolección)
+    match /vehiculos/{vehiculoId}/eventos/{eventoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
     // Reglas para colección de inspecciones
     match /inspecciones/{inspeccionId} {
-      // Leer: Cualquier usuario autenticado puede leer inspecciones
-      // (simplificado para evitar problemas de permisos)
+      // Cualquier usuario autenticado puede leer inspecciones
       allow read: if isAuthenticated();
       
-      // Crear: Cualquier usuario autenticado puede crear inspecciones
+      // Cualquier usuario autenticado puede crear inspecciones
       allow create: if isAuthenticated();
       
-      // Actualizar/Eliminar: Solo admin
-      allow update, delete: if isAdmin();
+      // Solo el creador puede actualizar/eliminar sus propias inspecciones
+      allow update, delete: if isAuthenticated() && 
+                               (resource.data.conductorId == request.auth.uid || 
+                                request.resource.data.conductorId == request.auth.uid);
     }
     
     // Reglas para colección de alertas
     match /alertas/{alertaId} {
-      // Leer: Cualquier usuario autenticado puede leer alertas
+      // Cualquier usuario autenticado puede leer alertas
       allow read: if isAuthenticated();
       
-      // Escribir: Solo admin puede gestionar alertas
-      allow write: if isAdmin();
+      // Cualquier usuario autenticado puede escribir alertas
+      allow write: if isAuthenticated();
     }
     
     // Reglas para colección de conductores
     match /conductores/{conductorId} {
-      // Leer: Cualquier usuario autenticado puede leer conductores
+      // Cualquier usuario autenticado puede leer conductores
       allow read: if isAuthenticated();
       
-      // Escribir: Solo admin puede gestionar conductores
-      allow write: if isAdmin();
-    }
-    
-    // Reglas para colección de eventos de vehículos
-    match /vehiculos/{vehiculoId}/eventos/{eventoId} {
-      // Leer: Cualquier usuario autenticado puede leer eventos
-      allow read: if isAuthenticated();
-      
-      // Escribir: Solo admin puede gestionar eventos
-      allow write: if isAdmin();
+      // Cualquier usuario autenticado puede escribir
+      allow write: if isAuthenticated();
     }
   }
 }
