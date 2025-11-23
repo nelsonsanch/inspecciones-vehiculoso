@@ -1,0 +1,89 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Función helper para verificar autenticación
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Función mejorada para verificar si el usuario es administrador
+    // Usa exists() primero para evitar errores si el documento no existe
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador';
+    }
+    
+    // Función mejorada para verificar si el usuario es conductor
+    function isConductor() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'conductor';
+    }
+    
+    // Reglas para colección de usuarios
+    match /users/{userId} {
+      // Leer: Usuario autenticado puede leer su propio documento sin necesidad de verificar admin
+      // O si el documento del usuario solicitante existe y es admin
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador')
+      );
+      
+      // Escribir: Solo admin puede crear/actualizar usuarios
+      allow write: if isAdmin();
+    }
+    
+    // Reglas para colección de vehículos
+    match /vehiculos/{vehiculoId} {
+      // Leer: Cualquier usuario autenticado puede leer vehículos
+      allow read: if isAuthenticated();
+      
+      // Escribir: Solo admin puede crear/actualizar/eliminar vehículos
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Reglas para colección de inspecciones
+    match /inspecciones/{inspeccionId} {
+      // Leer: Cualquier usuario autenticado puede leer inspecciones
+      // (simplificado para evitar problemas de permisos)
+      allow read: if isAuthenticated();
+      
+      // Crear: Cualquier usuario autenticado puede crear inspecciones
+      allow create: if isAuthenticated();
+      
+      // Actualizar/Eliminar: Solo admin
+      allow update, delete: if isAdmin();
+    }
+    
+    // Reglas para colección de alertas
+    match /alertas/{alertaId} {
+      // Leer: Cualquier usuario autenticado puede leer alertas
+      allow read: if isAuthenticated();
+      
+      // Escribir: Solo admin puede gestionar alertas
+      allow write: if isAdmin();
+    }
+    
+    // Reglas para colección de conductores
+    match /conductores/{conductorId} {
+      // Leer: Cualquier usuario autenticado puede leer conductores
+      allow read: if isAuthenticated();
+      
+      // Escribir: Solo admin puede gestionar conductores
+      allow write: if isAdmin();
+    }
+    
+    // Reglas para colección de eventos de vehículos
+    match /vehiculos/{vehiculoId}/eventos/{eventoId} {
+      // Leer: Cualquier usuario autenticado puede leer eventos
+      allow read: if isAuthenticated();
+      
+      // Escribir: Solo admin puede gestionar eventos
+      allow write: if isAdmin();
+    }
+  }
+}
