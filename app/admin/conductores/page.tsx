@@ -51,7 +51,9 @@ export default function ConductoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState<'todos' | 'activo' | 'inactivo'>('todos');
   const [conductorToToggle, setConductorToToggle] = useState<Conductor | null>(null);
+  const [conductorToDelete, setConductorToDelete] = useState<Conductor | null>(null);
   const [isToggling, setIsToggling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchConductores = async () => {
@@ -139,6 +141,59 @@ export default function ConductoresPage() {
     } finally {
       setIsToggling(false);
       setConductorToToggle(null);
+    }
+  };
+
+  const handleDeleteConductor = async (conductor: Conductor) => {
+    setConductorToDelete(conductor);
+  };
+
+  const confirmDelete = async () => {
+    if (!conductorToDelete) return;
+
+    setIsDeleting(true);
+    
+    try {
+      // Llamar a la API para eliminar el usuario
+      const response = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: conductorToDelete.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al eliminar el conductor');
+      }
+
+      // Eliminar del estado local
+      setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
+
+      // Mostrar advertencia sobre Firebase Auth
+      if (data.warning) {
+        toast.success('Conductor eliminado de Firestore', {
+          description: 'IMPORTANTE: Debes eliminar manualmente este usuario de Firebase Auth para liberar el email.',
+          duration: 10000,
+        });
+        
+        // Abrir consola de Firebase en nueva pestaña después de 3 segundos
+        setTimeout(() => {
+          if (data.authConsoleUrl) {
+            window.open(data.authConsoleUrl, '_blank');
+          }
+        }, 3000);
+      } else {
+        toast.success('Conductor eliminado correctamente');
+      }
+    } catch (error: any) {
+      console.error('Error deleting conductor:', error);
+      toast.error(error.message || 'Error al eliminar el conductor');
+    } finally {
+      setIsDeleting(false);
+      setConductorToDelete(null);
     }
   };
 
@@ -322,6 +377,15 @@ export default function ConductoresPage() {
                       <UserCheck className="h-4 w-4" />
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteConductor(conductor)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Eliminar conductor permanentemente"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -368,6 +432,53 @@ export default function ConductoresPage() {
                 </>
               ) : (
                 conductorToToggle?.estado === 'activo' ? 'Desactivar' : 'Activar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!conductorToDelete} onOpenChange={() => setConductorToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">⚠️ ¿Eliminar conductor permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Esta acción es <strong className="text-red-600">IRREVERSIBLE</strong>. Se eliminará permanentemente a{' '}
+                <strong>{conductorToDelete?.nombre}</strong> ({conductorToDelete?.email}) y todos sus datos asociados.
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
+                <p className="font-semibold text-yellow-800 mb-1">📋 Importante:</p>
+                <ul className="list-disc pl-5 text-yellow-700 space-y-1">
+                  <li>Se eliminará de Firestore (base de datos)</li>
+                  <li><strong>Deberás eliminar manualmente el usuario de Firebase Auth</strong> para liberar el email</li>
+                  <li>Se abrirá automáticamente la consola de Firebase para que lo hagas</li>
+                </ul>
+              </div>
+              <p className="text-sm text-gray-600">
+                💡 <strong>Recomendación:</strong> Si solo quieres desactivar temporalmente al conductor, 
+                usa el botón de "Desactivar" en lugar de eliminar.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Sí, Eliminar Permanentemente
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
