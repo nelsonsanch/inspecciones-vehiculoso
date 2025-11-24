@@ -45,6 +45,14 @@ export default function LoginForm() {
       
       const userData = userDoc.data();
       
+      // Verificar si el usuario está activo
+      if (userData?.estado === 'inactivo') {
+        await auth.signOut(); // Cerrar sesión inmediatamente
+        setError('Tu cuenta ha sido desactivada. Contacta al administrador para más información.');
+        setLoading(false);
+        return;
+      }
+      
       // Redirigir según el rol
       if (userData?.role === 'administrador') {
         router.push('/admin/dashboard');

@@ -145,6 +145,7 @@ export default function NuevoConductorPage() {
         email: formData.email,
         name: formData.nombre,
         role: 'conductor',
+        estado: 'activo',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -153,12 +154,14 @@ export default function NuevoConductorPage() {
       const conductorData = {
         ...formData,
         userId: firebaseUser.uid,
+        estado: 'activo',
         ...(fotoUrl && { fotoUrl }), // Agregar fotoUrl solo si existe
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      await addDoc(collection(db, 'conductores'), conductorData);
+      // Usar setDoc en lugar de addDoc para usar el mismo UID como ID
+      await setDoc(doc(db, 'conductores', firebaseUser.uid), conductorData);
 
       // Mostrar credenciales generadas
       setGeneratedCredentials({

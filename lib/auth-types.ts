@@ -4,6 +4,7 @@ export interface User {
   email: string;
   name: string;
   role: 'administrador' | 'conductor';
+  estado: 'activo' | 'inactivo';
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +43,7 @@ export interface Conductor {
   telefono: string;
   email: string;
   userId: string;
+  estado: 'activo' | 'inactivo';
   fotoUrl?: string; // URL de Firebase Storage con la foto del conductor
   // Fecha de vencimiento de licencia
   licenciaVencimiento?: string; // Formato: YYYY-MM-DD

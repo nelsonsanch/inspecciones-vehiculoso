@@ -54,7 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (userDoc && userDoc.exists()) {
             const userData = userDoc.data() as User;
-            setUser(userData);
+            
+            // Verificar si el usuario está inactivo
+            if (userData.estado === 'inactivo') {
+              console.warn('Usuario inactivo detectado, cerrando sesión');
+              await signOut(auth);
+              setUser(null);
+              setFirebaseUser(null);
+            } else {
+              setUser(userData);
+            }
           } else {
             console.warn('Usuario autenticado pero sin documento en Firestore');
             setUser(null);

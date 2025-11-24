@@ -2,12 +2,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Conductor } from '@/lib/auth-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,18 +29,29 @@ import {
   Loader2,
   Phone,
   CreditCard,
-  Mail
+  Mail,
+  UserX,
+  UserCheck,
+  Filter
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function ConductoresPage() {
   const [conductores, setConductores] = useState<Conductor[]>([]);
   const [filteredConductores, setFilteredConductores] = useState<Conductor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [conductorToDelete, setConductorToDelete] = useState<Conductor | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [estadoFilter, setEstadoFilter] = useState<'todos' | 'activo' | 'inactivo'>('todos');
+  const [conductorToToggle, setConductorToToggle] = useState<Conductor | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
     const fetchConductores = async () => {
@@ -76,27 +88,57 @@ export default function ConductoresPage() {
       );
     }
 
-    setFilteredConductores(filtered);
-  }, [searchTerm, conductores]);
+    // Filter by estado
+    if (estadoFilter !== 'todos') {
+      filtered = filtered.filter(conductor => conductor.estado === estadoFilter);
+    }
 
-  const handleDeleteConductor = async (conductor: Conductor) => {
-    setConductorToDelete(conductor);
+    setFilteredConductores(filtered);
+  }, [searchTerm, estadoFilter, conductores]);
+
+  const handleToggleEstado = async (conductor: Conductor) => {
+    setConductorToToggle(conductor);
   };
 
-  const confirmDelete = async () => {
-    if (!conductorToDelete) return;
+  const confirmToggleEstado = async () => {
+    if (!conductorToToggle) return;
 
-    setIsDeleting(true);
+    setIsToggling(true);
+    const nuevoEstado = conductorToToggle.estado === 'activo' ? 'inactivo' : 'activo';
+    
     try {
-      await deleteDoc(doc(db, 'conductores', conductorToDelete.id));
-      setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
-      toast.success('Conductor eliminado correctamente');
+      // Actualizar en Firestore (conductores)
+      await updateDoc(doc(db, 'conductores', conductorToToggle.id), {
+        estado: nuevoEstado,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Actualizar en Firestore (users) también
+      try {
+        await updateDoc(doc(db, 'users', conductorToToggle.id), {
+          estado: nuevoEstado,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.log('No se pudo actualizar en users, puede que no exista el documento');
+      }
+
+      // Actualizar estado local
+      setConductores(prev => prev.map(c => 
+        c.id === conductorToToggle.id ? { ...c, estado: nuevoEstado } : c
+      ));
+
+      toast.success(
+        nuevoEstado === 'inactivo' 
+          ? 'Conductor desactivado. No podrá iniciar sesión hasta que sea reactivado.' 
+          : 'Conductor reactivado correctamente'
+      );
     } catch (error) {
-      console.error('Error deleting conductor:', error);
-      toast.error('Error al eliminar el conductor');
+      console.error('Error toggling conductor estado:', error);
+      toast.error('Error al cambiar el estado del conductor');
     } finally {
-      setIsDeleting(false);
-      setConductorToDelete(null);
+      setIsToggling(false);
+      setConductorToToggle(null);
     }
   };
 
@@ -129,21 +171,40 @@ export default function ConductoresPage() {
         </Button>
       </div>
 
-      {/* Search */}
+      {/* Search and Filter */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
-            Buscar Conductores
+            Buscar y Filtrar Conductores
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Input
-            placeholder="Buscar por nombre, cédula, licencia o email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <Input
+                placeholder="Buscar por nombre, cédula, licencia o email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <Select value={estadoFilter} onValueChange={(value: 'todos' | 'activo' | 'inactivo') => setEstadoFilter(value)}>
+                <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="activo">Solo Activos</SelectItem>
+                  <SelectItem value="inactivo">Solo Inactivos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -183,8 +244,8 @@ export default function ConductoresPage() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Users className="h-6 w-6 text-green-600" />
+                    <div className={`p-2 rounded-lg ${conductor.estado === 'activo' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                      <Users className={`h-6 w-6 ${conductor.estado === 'activo' ? 'text-green-600' : 'text-gray-400'}`} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg text-gray-900">
@@ -195,6 +256,9 @@ export default function ConductoresPage() {
                       </p>
                     </div>
                   </div>
+                  <Badge variant={conductor.estado === 'activo' ? 'default' : 'secondary'}>
+                    {conductor.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                  </Badge>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -245,10 +309,18 @@ export default function ConductoresPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDeleteConductor(conductor)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleToggleEstado(conductor)}
+                    className={conductor.estado === 'activo' 
+                      ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" 
+                      : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                    }
+                    title={conductor.estado === 'activo' ? 'Desactivar conductor' : 'Activar conductor'}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {conductor.estado === 'activo' ? (
+                      <UserX className="h-4 w-4" />
+                    ) : (
+                      <UserCheck className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -257,30 +329,45 @@ export default function ConductoresPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!conductorToDelete} onOpenChange={() => setConductorToDelete(null)}>
+      {/* Toggle Estado Confirmation Dialog */}
+      <AlertDialog open={!!conductorToToggle} onOpenChange={() => setConductorToToggle(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar conductor?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {conductorToToggle?.estado === 'activo' ? '¿Desactivar conductor?' : '¿Activar conductor?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el conductor{' '}
-              <strong>{conductorToDelete?.nombre}</strong> y todos sus datos asociados.
+              {conductorToToggle?.estado === 'activo' ? (
+                <>
+                  Al desactivar a <strong>{conductorToToggle?.nombre}</strong>, no podrá iniciar sesión 
+                  en la aplicación hasta que sea reactivado. Sus datos históricos se mantendrán intactos 
+                  y podrás reactivarlo en cualquier momento.
+                </>
+              ) : (
+                <>
+                  Al activar a <strong>{conductorToToggle?.nombre}</strong>, podrá volver a iniciar sesión 
+                  en la aplicación y realizar inspecciones normalmente.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isToggling}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmToggleEstado}
+              disabled={isToggling}
+              className={conductorToToggle?.estado === 'activo' 
+                ? "bg-orange-600 hover:bg-orange-700" 
+                : "bg-green-600 hover:bg-green-700"
+              }
             >
-              {isDeleting ? (
+              {isToggling ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Eliminando...
+                  {conductorToToggle?.estado === 'activo' ? 'Desactivando...' : 'Activando...'}
                 </>
               ) : (
-                'Eliminar'
+                conductorToToggle?.estado === 'activo' ? 'Desactivar' : 'Activar'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
