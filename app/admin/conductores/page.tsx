@@ -173,16 +173,24 @@ export default function ConductoresPage() {
       // Eliminar del estado local
       setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
 
-      // Mostrar advertencia sobre Firebase Auth
-      toast.success('Conductor eliminado de Firestore', {
-        description: 'IMPORTANTE: Debes eliminar manualmente este usuario de Firebase Auth para liberar el email.',
-        duration: 10000,
+      // Mostrar advertencia detallada sobre Firebase Auth
+      toast.warning('⚠️ PASO 2 REQUERIDO: Eliminar de Firebase Auth', {
+        description: `El conductor fue eliminado de la base de datos, pero el email "${conductorEmail}" todavía existe en Firebase Authentication. Se abrirá la consola en 3 segundos. DEBES buscar y eliminar "${conductorEmail}" para poder reutilizar ese email.`,
+        duration: 15000,
       });
       
       // Abrir consola de Firebase en nueva pestaña después de 3 segundos
       setTimeout(() => {
         const authConsoleUrl = `https://console.firebase.google.com/project/${projectId}/authentication/users`;
         window.open(authConsoleUrl, '_blank');
+        
+        // Segundo toast recordatorio
+        setTimeout(() => {
+          toast.info('🔍 Instrucciones:', {
+            description: `En la consola de Firebase: 1) Busca "${conductorEmail}", 2) Click en los 3 puntos ⋮, 3) Selecciona "Delete account", 4) Confirma`,
+            duration: 20000,
+          });
+        }, 4000);
       }, 3000);
       
     } catch (error: any) {

@@ -174,7 +174,15 @@ export default function NuevoConductorPage() {
       console.error('Error adding conductor:', error);
       
       if (error.code === 'auth/email-already-in-use') {
-        toast.error('Ya existe un usuario con este email');
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        toast.error('❌ Email ya registrado en Firebase Auth', {
+          description: `El email "${formData.email}" existe en Firebase Authentication. Para reutilizarlo: 1) Ve a Firebase Console, 2) Busca y elimina ese email, 3) Intenta crear el conductor nuevamente.`,
+          duration: 15000,
+          action: {
+            label: 'Abrir Firebase Console',
+            onClick: () => window.open(`https://console.firebase.google.com/project/${projectId}/authentication/users`, '_blank')
+          }
+        });
       } else if (error.code === 'auth/weak-password') {
         toast.error('La contraseña es muy débil');
       } else if (error.code === 'auth/invalid-email') {
