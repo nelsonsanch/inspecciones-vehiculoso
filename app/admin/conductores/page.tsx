@@ -154,40 +154,37 @@ export default function ConductoresPage() {
     setIsDeleting(true);
     
     try {
-      // Llamar a la API para eliminar el usuario
-      const response = await fetch('/api/delete-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: conductorToDelete.id }),
-      });
+      const conductorEmail = conductorToDelete.email;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al eliminar el conductor');
+      // Eliminar directamente de Firestore usando el cliente autenticado
+      // (esto funciona porque el usuario administrador está autenticado)
+      
+      // Eliminar de la colección 'conductores'
+      try {
+        await deleteDoc(doc(db, 'conductores', conductorToDelete.id));
+      } catch (error) {
+        console.log('No se pudo eliminar de conductores (puede que no exista):', error);
       }
+
+      // Eliminar de la colección 'users'
+      await deleteDoc(doc(db, 'users', conductorToDelete.id));
 
       // Eliminar del estado local
       setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
 
       // Mostrar advertencia sobre Firebase Auth
-      if (data.warning) {
-        toast.success('Conductor eliminado de Firestore', {
-          description: 'IMPORTANTE: Debes eliminar manualmente este usuario de Firebase Auth para liberar el email.',
-          duration: 10000,
-        });
-        
-        // Abrir consola de Firebase en nueva pestaña después de 3 segundos
-        setTimeout(() => {
-          if (data.authConsoleUrl) {
-            window.open(data.authConsoleUrl, '_blank');
-          }
-        }, 3000);
-      } else {
-        toast.success('Conductor eliminado correctamente');
-      }
+      toast.success('Conductor eliminado de Firestore', {
+        description: 'IMPORTANTE: Debes eliminar manualmente este usuario de Firebase Auth para liberar el email.',
+        duration: 10000,
+      });
+      
+      // Abrir consola de Firebase en nueva pestaña después de 3 segundos
+      setTimeout(() => {
+        const authConsoleUrl = `https://console.firebase.google.com/project/${projectId}/authentication/users`;
+        window.open(authConsoleUrl, '_blank');
+      }, 3000);
+      
     } catch (error: any) {
       console.error('Error deleting conductor:', error);
       toast.error(error.message || 'Error al eliminar el conductor');
