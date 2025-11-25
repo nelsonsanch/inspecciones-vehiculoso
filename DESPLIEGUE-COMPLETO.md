@@ -36,11 +36,48 @@ Tu aplicación tiene **3 componentes principales**:
 
 ---
 
-## 🔧 **Desplegar Cloud Functions (PENDIENTE)**
+## 🔧 **Desplegar Cloud Functions**
 
-Este es el único paso que falta para que la eliminación automática funcione.
+Hay **3 opciones** para desplegar las Cloud Functions:
 
-### **Opción A: Desde tu Computadora**
+### **Opción A: GitHub Actions (RECOMENDADO) ⭐**
+
+**Despliegue 100% automático cada vez que haces push a GitHub.**
+
+#### **Configuración (Solo una vez):**
+
+1. **Generar token de Firebase:**
+   ```bash
+   npm install -g firebase-tools
+   firebase login:ci
+   ```
+   Copia el token que te da.
+
+2. **Agregar el token a GitHub:**
+   - Ve a: https://github.com/nelsonsanch/inspecciones-vehiculoso/settings/secrets/actions
+   - Haz clic en "New repository secret"
+   - Name: `FIREBASE_TOKEN`
+   - Value: Pega el token
+   - Clic en "Add secret"
+
+3. **Hacer push para probar:**
+   ```bash
+   git add .
+   git commit -m "Test: Despliegue automático"
+   git push origin main
+   ```
+
+4. **Verificar en GitHub Actions:**
+   - Ve a: https://github.com/nelsonsanch/inspecciones-vehiculoso/actions
+   - Deberías ver el workflow ejecutándose
+
+**A partir de ahora:** Cada push despliega automáticamente las Cloud Functions. 🚀
+
+**Documentación completa:** Ver `GITHUB-ACTIONS-SETUP.md`
+
+---
+
+### **Opción B: Desde tu Computadora**
 
 #### **Requisitos:**
 - Node.js instalado
@@ -86,29 +123,17 @@ Este es el único paso que falta para que la eliminación automática funcione.
 
 ---
 
-### **Opción B: Desde Abacus.AI**
+### **Opción C: Con Token CI**
 
-Si tienes acceso al entorno de Abacus.AI donde está el proyecto:
+Si prefieres usar un token sin configurar GitHub Actions:
 
 ```bash
-cd /home/ubuntu/inspecciones-vehiculoso/nextjs_space
+# Generar token (desde tu PC)
+firebase login:ci
 
-# Instalar Firebase CLI
-npm install -g firebase-tools
-
-# Login
-firebase login --no-localhost
-
-# Seleccionar proyecto
-firebase use inspecciones-vehiculoso
-
-# Instalar dependencias
-cd functions
-npm install
-cd ..
-
-# Desplegar
-firebase deploy --only functions
+# Desplegar usando el token
+export FIREBASE_TOKEN="tu-token-aqui"
+firebase deploy --only functions --token "$FIREBASE_TOKEN"
 ```
 
 ---
