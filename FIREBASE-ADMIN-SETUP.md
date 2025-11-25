@@ -1,4 +1,14 @@
-# 🔑 Configuración de Firebase Admin SDK
+# ⚠️ OBSOLETO - USA CLOUD FUNCTIONS EN SU LUGAR
+
+**NOTA IMPORTANTE:** Este documento describe un método obsoleto que ya no es necesario debido a restricciones de políticas de organización de Google Cloud.
+
+**En su lugar, usa Cloud Functions que no requieren configuración manual de claves.**
+
+📖 **Ver:** `CLOUD-FUNCTIONS-SETUP.md` para la solución actual y recomendada.
+
+---
+
+# 🔑 Configuración de Firebase Admin SDK (Método Obsoleto)
 
 ## 🎯 Objetivo
 

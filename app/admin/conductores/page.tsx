@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Conductor } from '@/lib/auth-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,21 +110,12 @@ export default function ConductoresPage() {
     const nuevoEstado = conductorToToggle.estado === 'activo' ? 'inactivo' : 'activo';
     
     try {
-      // Actualizar en Firestore (conductores)
-      await updateDoc(doc(db, 'conductores', conductorToToggle.id), {
-        estado: nuevoEstado,
-        updatedAt: new Date().toISOString()
-      });
-
-      // Actualizar en Firestore (users) también
-      try {
-        await updateDoc(doc(db, 'users', conductorToToggle.id), {
-          estado: nuevoEstado,
-          updatedAt: new Date().toISOString()
-        });
-      } catch (error) {
-        console.log('No se pudo actualizar en users, puede que no exista el documento');
-      }
+      // Usar Cloud Function para cambiar el estado
+      const functions = getFunctions();
+      const functionName = nuevoEstado === 'activo' ? 'activateConductor' : 'deactivateConductor';
+      const toggleConductorFn = httpsCallable(functions, functionName);
+      
+      await toggleConductorFn({ conductorId: conductorToToggle.id });
 
       // Actualizar estado local
       setConductores(prev => prev.map(c => 
@@ -156,23 +148,14 @@ export default function ConductoresPage() {
     try {
       const conductorEmail = conductorToDelete.email;
 
-      // Llamar al API endpoint que usa Firebase Admin SDK
+      // Llamar a la Cloud Function para eliminar
       // Esto eliminará COMPLETAMENTE el conductor:
       // 1. De Firebase Authentication
       // 2. De Firestore (users + conductores)
-      const response = await fetch('/api/delete-conductor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: conductorToDelete.id }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al eliminar el conductor');
-      }
+      const functions = getFunctions();
+      const deleteConductorFn = httpsCallable(functions, 'deleteConductor');
+      
+      const result = await deleteConductorFn({ conductorId: conductorToDelete.id });
 
       // Eliminar del estado local
       setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
