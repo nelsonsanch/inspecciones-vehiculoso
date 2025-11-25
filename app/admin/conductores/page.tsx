@@ -155,47 +155,39 @@ export default function ConductoresPage() {
     
     try {
       const conductorEmail = conductorToDelete.email;
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-      // Eliminar directamente de Firestore usando el cliente autenticado
-      // (esto funciona porque el usuario administrador está autenticado)
-      
-      // Eliminar de la colección 'conductores'
-      try {
-        await deleteDoc(doc(db, 'conductores', conductorToDelete.id));
-      } catch (error) {
-        console.log('No se pudo eliminar de conductores (puede que no exista):', error);
+      // Llamar al API endpoint que usa Firebase Admin SDK
+      // Esto eliminará COMPLETAMENTE el conductor:
+      // 1. De Firebase Authentication
+      // 2. De Firestore (users + conductores)
+      const response = await fetch('/api/delete-conductor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: conductorToDelete.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al eliminar el conductor');
       }
-
-      // Eliminar de la colección 'users'
-      await deleteDoc(doc(db, 'users', conductorToDelete.id));
 
       // Eliminar del estado local
       setConductores(prev => prev.filter(c => c.id !== conductorToDelete.id));
 
-      // Mostrar advertencia detallada sobre Firebase Auth
-      toast.warning('⚠️ PASO 2 REQUERIDO: Eliminar de Firebase Auth', {
-        description: `El conductor fue eliminado de la base de datos, pero el email "${conductorEmail}" todavía existe en Firebase Authentication. Se abrirá la consola en 3 segundos. DEBES buscar y eliminar "${conductorEmail}" para poder reutilizar ese email.`,
-        duration: 15000,
+      // Mostrar mensaje de éxito
+      toast.success('✅ Conductor eliminado completamente', {
+        description: `El conductor "${conductorEmail}" fue eliminado de Firebase Auth y Firestore. El email ahora está disponible para reutilizar.`,
+        duration: 8000,
       });
-      
-      // Abrir consola de Firebase en nueva pestaña después de 3 segundos
-      setTimeout(() => {
-        const authConsoleUrl = `https://console.firebase.google.com/project/${projectId}/authentication/users`;
-        window.open(authConsoleUrl, '_blank');
-        
-        // Segundo toast recordatorio
-        setTimeout(() => {
-          toast.info('🔍 Instrucciones:', {
-            description: `En la consola de Firebase: 1) Busca "${conductorEmail}", 2) Click en los 3 puntos ⋮, 3) Selecciona "Delete account", 4) Confirma`,
-            duration: 20000,
-          });
-        }, 4000);
-      }, 3000);
       
     } catch (error: any) {
       console.error('Error deleting conductor:', error);
-      toast.error(error.message || 'Error al eliminar el conductor');
+      toast.error('Error al eliminar el conductor', {
+        description: error.message || 'Ocurrió un error inesperado',
+      });
     } finally {
       setIsDeleting(false);
       setConductorToDelete(null);
@@ -449,22 +441,24 @@ export default function ConductoresPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-600">⚠️ ¿Eliminar conductor permanentemente?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <p>
-                Esta acción es <strong className="text-red-600">IRREVERSIBLE</strong>. Se eliminará permanentemente a{' '}
-                <strong>{conductorToDelete?.nombre}</strong> ({conductorToDelete?.email}) y todos sus datos asociados.
+              <p className="text-sm text-gray-700">
+                Esta acción es <strong className="text-red-600">IRREVERSIBLE</strong>. Se eliminará <strong>automáticamente y completamente</strong> a{' '}
+                <strong>{conductorToDelete?.nombre}</strong> ({conductorToDelete?.email}).
               </p>
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
-                <p className="font-semibold text-yellow-800 mb-1">📋 Importante:</p>
-                <ul className="list-disc pl-5 text-yellow-700 space-y-1">
-                  <li>Se eliminará de Firestore (base de datos)</li>
-                  <li><strong>Deberás eliminar manualmente el usuario de Firebase Auth</strong> para liberar el email</li>
-                  <li>Se abrirá automáticamente la consola de Firebase para que lo hagas</li>
+              <div className="bg-red-50 border border-red-200 rounded p-3 text-sm">
+                <p className="font-semibold text-red-800 mb-2">🗑️ Se eliminará de:</p>
+                <ul className="list-none space-y-1 text-red-700">
+                  <li>✅ Firebase Authentication (email quedará disponible)</li>
+                  <li>✅ Base de datos Firestore (users + conductores)</li>
+                  <li>✅ Todos los datos asociados</li>
                 </ul>
               </div>
-              <p className="text-sm text-gray-600">
-                💡 <strong>Recomendación:</strong> Si solo quieres desactivar temporalmente al conductor, 
-                usa el botón de "Desactivar" en lugar de eliminar.
-              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+                <p className="text-blue-800">
+                  💡 <strong>Recomendación:</strong> Si solo quieres desactivar temporalmente al conductor, 
+                  usa el botón <strong>"Desactivar"</strong> en lugar de eliminar.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
