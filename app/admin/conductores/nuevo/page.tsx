@@ -2,9 +2,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -135,60 +132,56 @@ export default function NuevoConductorPage() {
       // Generar contraseña automática
       const generatedPassword = generatePassword();
 
-      // Crear usuario en Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, generatedPassword);
-      const firebaseUser = userCredential.user;
-
-      // Crear documento del usuario en Firestore con el UID como ID del documento
-      await setDoc(doc(db, 'users', firebaseUser.uid), {
-        id: firebaseUser.uid,
-        email: formData.email,
-        name: formData.nombre,
-        role: 'conductor',
-        estado: 'activo',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Crear documento del conductor
       const conductorData = {
         ...formData,
-        userId: firebaseUser.uid,
-        estado: 'activo',
         ...(fotoUrl && { fotoUrl }), // Agregar fotoUrl solo si existe
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
 
-      // Usar setDoc en lugar de addDoc para usar el mismo UID como ID
-      await setDoc(doc(db, 'conductores', firebaseUser.uid), conductorData);
+      // Llamar a la API para crear el conductor y el usuario de Auth
+      const response = await fetch('/api/conductores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conductorData,
+          password: generatedPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw {
+          code: errorData.code || `HTTP error! status: ${response.status}`,
+          message: errorData.error || 'Error desconocido desde la API',
+        };
+      }
 
       // Mostrar credenciales generadas
       setGeneratedCredentials({
         email: formData.email,
         password: generatedPassword
       });
-
+      
       toast.success('Conductor agregado correctamente');
+
     } catch (error: any) {
       console.error('Error adding conductor:', error);
       
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.code === 'auth/email-already-exists') {
         const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
         toast.error('❌ Email ya registrado en Firebase Auth', {
           description: `El email "${formData.email}" existe en Firebase Authentication. Para reutilizarlo: 1) Ve a Firebase Console, 2) Busca y elimina ese email, 3) Intenta crear el conductor nuevamente.`,
           duration: 15000,
           action: {
             label: 'Abrir Firebase Console',
-            onClick: () => window.open(`https://console.firebase.google.com/project/${projectId}/authentication/users`, '_blank')
+            onClick: () => window.open(`https://console.firebase.google.com/u/0/project/${projectId}/authentication/users`, '_blank')
           }
         });
-      } else if (error.code === 'auth/weak-password') {
-        toast.error('La contraseña es muy débil');
-      } else if (error.code === 'auth/invalid-email') {
-        toast.error('Email inválido');
       } else {
-        toast.error('Error al agregar el conductor');
+        toast.error('Error al agregar el conductor', {
+          description: error.message,
+        });
       }
     } finally {
       setLoading(false);

@@ -9,22 +9,20 @@ function initializeAdmin() {
   }
 
   try {
-    // Verificar que las credenciales están disponibles
-    if (!process.env.FIREBASE_ADMIN_CLIENT_EMAIL || !process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
-      console.warn('Firebase Admin SDK credentials not configured. Delete functionality will not work.');
-      return;
-    }
+    // Estrategia de inicialización flexible:
+    // 1. (Producción en Netlify/Vercel): Usar un token de acceso si está disponible.
+    // 2. (Local/Google Cloud): Usar Application Default Credentials (ADC).
 
-    // Configuración usando variables de entorno
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        // La private key viene como string con \n, hay que reemplazarlos
-        privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }),
-      databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`,
-    });
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      // Método para producción (Netlify/Vercel con Workload Identity Federation).
+      // El SDK lee esta variable automáticamente.
+      console.log('Inicializando Firebase Admin SDK con Workload Identity Federation...');
+      admin.initializeApp();
+    } else {
+      // Método para desarrollo local (usando `gcloud auth application-default login`).
+      console.log('Inicializando Firebase Admin SDK con Application Default Credentials...');
+      admin.initializeApp();
+    }
     
     adminInitialized = true;
     console.log('Firebase Admin SDK inicializado correctamente');

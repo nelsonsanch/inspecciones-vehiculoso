@@ -34,14 +34,13 @@ import {
   Heart,
   AlertTriangle,
   Clock,
-  Edit,
-  Users
+  Edit
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ItemInspeccion } from '@/components/inspeccion/item-inspeccion';
-import Image from 'next/image';
+import { FotoVehiculo } from '@/app/admin/vehiculos/[id]/foto-vehiculo';
 
 interface InspeccionFormData {
   kilometrajeActual: number;
@@ -457,100 +456,42 @@ export default function FormularioInspeccionPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Foto del Conductor */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <h3 className="text-sm font-medium text-gray-700">Conductor</h3>
               <div className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50">
-                {conductor.fotoUrl ? (
-                  <Image
-                    src={conductor.fotoUrl}
-                    alt={`Foto de ${conductor.nombre}`}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                    <Users className="h-16 w-16 mb-2" />
-                    <span className="text-sm">Sin foto</span>
-                  </div>
-                )}
+                <ImageFromStorage
+                  storagePath={conductor.fotoUrl || ''}
+                  alt={`Foto de ${conductor.nombre}`}
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div className="text-sm text-center space-y-1">
                 <p className="font-medium text-gray-900">{conductor.nombre}</p>
                 <p className="text-gray-600">Lic. {conductor.numeroLicencia}</p>
               </div>
-            </div>
+            </div> */}
 
             {/* Fotos del Vehículo */}
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-gray-700">Vehículo</h3>
               <div className="grid grid-cols-2 gap-2">
-                {/* Foto Delantera */}
-                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                  {vehiculo.fotos?.delantera ? (
-                    <Image
-                      src={vehiculo.fotos.delantera}
-                      alt="Vista delantera del vehículo"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <Car className="h-8 w-8" />
-                      <span className="text-xs mt-1">Frontal</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Foto Lateral Izquierda */}
-                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                  {vehiculo.fotos?.lateralIzquierda ? (
-                    <Image
-                      src={vehiculo.fotos.lateralIzquierda}
-                      alt="Vista lateral izquierda del vehículo"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <Car className="h-8 w-8" />
-                      <span className="text-xs mt-1">Lateral Izq.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Foto Lateral Derecha */}
-                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                  {vehiculo.fotos?.lateralDerecha ? (
-                    <Image
-                      src={vehiculo.fotos.lateralDerecha}
-                      alt="Vista lateral derecha del vehículo"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <Car className="h-8 w-8" />
-                      <span className="text-xs mt-1">Lateral Der.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Foto Trasera */}
-                <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                  {vehiculo.fotos?.trasera ? (
-                    <Image
-                      src={vehiculo.fotos.trasera}
-                      alt="Vista trasera del vehículo"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <Car className="h-8 w-8" />
-                      <span className="text-xs mt-1">Trasera</span>
-                    </div>
-                  )}
-                </div>
+                <FotoVehiculo
+                  label="Frontal"
+                  cloudStoragePath={vehiculo.fotos?.delantera || ''}
+                />
+                <FotoVehiculo
+                  label="Lateral Izq."
+                  cloudStoragePath={vehiculo.fotos?.lateralIzquierda || ''}
+                />
+                <FotoVehiculo
+                  label="Lateral Der."
+                  cloudStoragePath={vehiculo.fotos?.lateralDerecha || ''}
+                />
+                <FotoVehiculo
+                  label="Trasera"
+                  cloudStoragePath={vehiculo.fotos?.trasera || ''}
+                />
               </div>
               <div className="text-sm text-center space-y-1 mt-2">
                 <p className="font-medium text-gray-900">{vehiculo.placa}</p>

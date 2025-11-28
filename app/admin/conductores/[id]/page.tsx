@@ -25,6 +25,7 @@ import {
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { ImageFromStorage } from '@/components/ui/image-from-storage';
 import { es } from 'date-fns/locale';
 
 interface Conductor {
@@ -36,6 +37,7 @@ interface Conductor {
   licencia: string;
   estado: 'activo' | 'inactivo';
   createdAt: string;
+  fotoUrl?: string;
 }
 
 interface Inspeccion {
@@ -153,24 +155,31 @@ export default function ConductorDetailPage() {
               Información General
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Nombre Completo
-                </label>
-                <p className="text-lg font-medium">{conductor.nombre}</p>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-6">
+              <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                {conductor.fotoUrl ? (
+                  <ImageFromStorage
+                    storagePath={conductor.fotoUrl}
+                    alt={`Foto de ${conductor.nombre}`}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <User className="h-12 w-12 text-gray-400" />
+                )}
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                <div className="mt-1">
-                  <Badge variant={conductor.estado === 'activo' ? 'default' : 'secondary'}>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold">{conductor.nombre}</h2>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-muted-foreground">Estado:</label>
+                  <Badge variant={conductor.estado === 'activo' ? 'default' : 'destructive'}>
                     {conductor.estado === 'activo' ? (
-                      <CheckCircle className="h-3 w-3 mr-1" />
+                      <CheckCircle className="h-3 w-3 mr-1.5" />
                     ) : (
-                      <XCircle className="h-3 w-3 mr-1" />
+                      <XCircle className="h-3 w-3 mr-1.5" />
                     )}
-                    {conductor.estado}
+                    {conductor.estado.charAt(0).toUpperCase() + conductor.estado.slice(1)}
                   </Badge>
                 </div>
               </div>
